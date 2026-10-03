@@ -9,7 +9,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 client = Groq(api_key=GROQ_API_KEY)
 
-MODEL_NAME = "qwen/qwen3.8-27b"
+MODEL_NAME = "openai/gpt-oss-120b"
 FALLBACK_MODEL = "openai/gpt-oss-20b"
 
 def generate_medical_response(
@@ -73,15 +73,17 @@ def generate_medical_response(
         mode_instructions = f"""
 - MODE: REGISTERED PATIENT (Personal Profile Active)
 {profile_summary}
-  * Evaluate the inquiry strictly against the patient's personal profile (Allergies, Medications, Age, Conditions):
-    - If a CONFLICT or CONTRAINDICATION is found (e.g. allergy match, medication interaction, or condition contraindication):
-      Warning: Not safe for your profile. [Direct 1-line specific reason: e.g. You are allergic to Penicillin, and Augmentin contains Amoxicillin].
-      {"- **Safe Alternatives:** [List 1-2 allergen-free safe alternatives from evidence]" if asked_for_alternatives else ""}
-    - If SAFE for their profile:
-      - Answer the question directly, accurately, and concisely.
-      - Mention profile safety directly and naturally in 1 short sentence without robotic canned templates (e.g. "Safe for your profile: No conflict with your condition or allergies").
-      - NEVER use repetitive robotic boilerplate sentences.
-      {"- **Alternative Brands:** [List substitutes from database]" if asked_for_alternatives else ""}
+  * DYNAMIC CLINICAL REASONING (NO FIXED/CANNED PHRASES):
+    Evaluate the user's question and the specific medicine against the patient's actual profile (Allergies, Medications, Conditions).
+    - If the medicine is NOT SAFE or CONTRAINDICATED:
+      Clearly state why it is not safe by explaining the exact clinical reason derived directly from the user's question, the drug's pharmacology, and their profile (e.g. explain why Augmentin triggers a penicillin allergy, or why an NSAID elevates blood pressure in a hypertensive patient).
+      {"- Safe Alternatives: List 1-2 allergen-free safe alternative medicines from evidence." if asked_for_alternatives else ""}
+    - If the medicine IS SAFE for their profile:
+      Directly answer what was asked (dosage, timing, directions). Conclude naturally with the specific reason it is compatible with their profile (e.g. confirming it does not affect their blood pressure or cause allergic conflict).
+      {"- Alternative Brands: List equivalent brands from the database." if asked_for_alternatives else ""}
+  * ABSOLUTELY FORBIDDEN:
+    - NEVER use generic canned phrases or repetitive formulas like "No known interactions exist with your saved medications or allergies".
+    - Explain the actual clinical reason specific to the medicine and the patient's condition.
 """
     else:  # guest
         mode_instructions = f"""
@@ -131,7 +133,7 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            max_tokens=350,
+            max_tokens=650,
             temperature=0.2
         )
         answer = completion.choices[0].message.content.strip()
@@ -144,7 +146,7 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=350,
+                max_tokens=650,
                 temperature=0.2
             )
             answer = completion.choices[0].message.content.strip()
