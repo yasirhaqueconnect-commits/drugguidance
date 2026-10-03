@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Dict, Any, Optional
 from groq import Groq
 from dotenv import load_dotenv
@@ -95,8 +96,12 @@ def generate_medical_response(
 CORE PRINCIPLES:
 1. Respond strictly in clear ENGLISH only.
 2. Zero emojis, icons, or logos (no ⚠️, 🚨, etc.).
-3. Direct & Concise: Answer what the user specifically asked without preachy filler or unsolicited boilerplate disclaimers.
-4. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
+3. Direct & Concise: Answer what the user specifically asked without preachy filler, unsolicited boilerplate, or 'Note:' commentary.
+4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain (e.g. NEVER say 'Note: The evidence provided lists...').
+5. Medication / Treatment Inquiries for Conditions (e.g. 'suggest medicine for high blood pressure', 'fever', 'acidity', 'infection'):
+   - Provide recommended therapeutic agents / first-line classes from the database or evidence.
+   - Do NOT output contraindicated or negative drug pairs unless the user explicitly asked about interactions or what to avoid!
+6. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
 
 {mode_instructions}
 """
@@ -139,6 +144,9 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
         except Exception as e2:
             answer = f"Evidence Records:\n{context_str}"
             used_model = "direct_evidence"
+
+    # Universal strip of any trailing "Note:..." or "**Note:**..." meta-commentary
+    answer = re.sub(r'(?:\n+|^)\s*(?:\*\*)?Note:?\s*(?:\*\*)?.*$', '', answer, flags=re.DOTALL | re.IGNORECASE).strip()
 
     # Detect safety alerts
     safety_alert = any(w in answer.lower() for w in ["warning:", "contraindicated", "avoid using together", "allergic reaction"])

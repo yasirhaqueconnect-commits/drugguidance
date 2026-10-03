@@ -25,16 +25,44 @@ class FastMedicalRAG:
         return words
 
     def search(self, query: str, top_k: int = 5, category: Optional[str] = None, user_profile: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        query_tokens = self._tokenize(query)
+        query_lower = query.lower()
+
+        # 1. Normalize common clinical/phonetic typos
+        norm_query = query_lower
+        typo_map = {
+            r"\bblod\b": "blood",
+            r"\bperssure\b": "pressure",
+            r"\bpresure\b": "pressure",
+            r"\bhypertention\b": "hypertension",
+            r"\bheadach\b": "headache",
+            r"\bfevr\b": "fever",
+            r"\bstomac\b": "stomach",
+            r"\bmedicne\b": "medicine",
+            r"\bmedicals\b": "medicine",
+            r"\bsugr\b": "diabetes",
+            r"\bsugar\b": "diabetes"
+        }
+        for pat, repl in typo_map.items():
+            norm_query = re.sub(pat, repl, norm_query)
+
+        query_tokens = self._tokenize(norm_query)
         if not query_tokens:
             return []
 
-        # Detect specific query intents (interaction, dosage, alternative, allergy)
-        query_lower = query.lower()
-        is_interaction_query = any(w in query_lower for w in ["interaction", "together", "with", "take with", "mix", "combine"])
-        is_dosage_query = any(w in query_lower for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day"])
-        is_alternative_query = any(w in query_lower for w in ["alternative", "substitute", "replace", "brand", "price", "pkr"])
-        is_allergy_query = any(w in query_lower for w in ["allergic", "allergy", "rash", "reaction", "sensitiz", "safe"])
+        # Stop words that should NOT generate raw keyword match points
+        STOP_WORDS = {
+            "suggest", "suggests", "recommend", "recommends", "medical", "medicine",
+            "medicines", "drug", "drugs", "for", "with", "take", "taking", "can",
+            "give", "tell", "what", "which", "and", "the", "of", "to", "in", "is",
+            "a", "an", "high", "low", "some", "any", "please", "help"
+        }
+
+        # Detect specific query intents (interaction, dosage, alternative, allergy, treatment)
+        is_interaction_query = any(w in norm_query for w in ["interaction", "together", "take with", "mix", "combine", "interact", "contraindicated"])
+        is_dosage_query = any(w in norm_query for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day"])
+        is_alternative_query = any(w in norm_query for w in ["alternative", "substitute", "replace", "brand", "price", "pkr"])
+        is_allergy_query = any(w in norm_query for w in ["allergic", "allergy", "rash", "reaction", "sensitiz", "safe"])
+        is_treatment_query = any(w in norm_query for w in ["suggest", "recommend", "medicine for", "drug for", "treatment", "what to take", "what can i take", "treatment for"])
 
         # Profile context tokens (allergies & current meds)
         profile_allergies = []
@@ -45,7 +73,7 @@ class FastMedicalRAG:
             if user_profile.get("current_medications"):
                 profile_meds = self._tokenize(str(user_profile.get("current_medications")))
 
-        # Symptom mapping to dataset keywords
+        # Symptom and Condition mapping to dataset keywords
         symptom_map = {
             "headache": ["paracetamol", "panadol", "ibuprofen", "brufen"],
             "fever": ["paracetamol", "panadol", "ibuprofen", "brufen", "antipyretic"],
@@ -57,12 +85,17 @@ class FastMedicalRAG:
             "nausea": ["dimenhydrinate", "gravinate"],
             "cough": ["salbutamol", "ventolin"],
             "asthma": ["salbutamol", "ventolin"],
-            "infection": ["amoxicillin", "augmentin", "azithromycin"]
+            "infection": ["amoxicillin", "augmentin", "azithromycin"],
+            "blood pressure": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
+            "hypertension": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
+            "high bp": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
+            "allergy": ["cetirizine", "zyrtec"],
+            "itching": ["cetirizine", "zyrtec"]
         }
 
-        expanded_tokens = list(query_tokens)
+        expanded_tokens = [t for t in query_tokens if t not in STOP_WORDS]
         for sym, mapped_meds in symptom_map.items():
-            if sym in query_lower:
+            if sym in norm_query:
                 expanded_tokens.extend(mapped_meds)
 
         scores: Dict[int, float] = {}
@@ -81,20 +114,26 @@ class FastMedicalRAG:
             med_name_lower = chunk["medicine_name"].lower()
             generic_lower = chunk["generic_name"].lower()
 
-            # Exact or substring match on medicine name
+            # Exact or substring match on medicine name (excluding stop words)
             for token in query_tokens:
+                if token in STOP_WORDS:
+                    continue
                 if len(token) > 3 and token in med_name_lower:
                     score += 5.0
                 if len(token) > 3 and token in generic_lower:
                     score += 4.0
 
             # Multi-word medicine check
-            if any(med_part in query_lower for med_part in med_name_lower.split() if len(med_part) > 3):
+            if any(med_part in norm_query for med_part in med_name_lower.split() if len(med_part) > 3 and med_part not in STOP_WORDS):
                 score += 3.0
 
             # Boost category based on intent
             if is_interaction_query and chunk["category"] == "interaction":
                 score += 8.0
+            elif not is_interaction_query and is_treatment_query and chunk["category"] == "interaction":
+                # User asked what to TAKE, do not prioritize interaction warnings
+                score -= 3.0
+
             if is_dosage_query and chunk["category"] == "dosage":
                 score += 6.0
             if is_alternative_query and chunk["category"] == "alternative":
