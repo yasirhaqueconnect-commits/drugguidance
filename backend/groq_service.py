@@ -74,14 +74,14 @@ def generate_medical_response(
 - MODE: REGISTERED PATIENT (Personal Profile Active)
 {profile_summary}
   * Evaluate the inquiry strictly against the patient's personal profile (Allergies, Medications, Age, Conditions):
-    - If a CONFLICT or CONTRAINDICATION is found (e.g. allergy match or interaction with ongoing meds):
-      Warning: Not safe for your profile. [Direct 1-line reason: e.g. You are allergic to Penicillin, and Augmentin contains Amoxicillin].
-      {"- **Safe Alternatives:** [List 1-2 allergen-free safe alternatives from evidence]" if asked_for_alternatives else "(Do NOT list alternative medicines because the user did not ask for them)."}
-      - **Action:** [Consult your doctor for a prescription]
+    - If a CONFLICT or CONTRAINDICATION is found (e.g. allergy match, medication interaction, or condition contraindication):
+      Warning: Not safe for your profile. [Direct 1-line specific reason: e.g. You are allergic to Penicillin, and Augmentin contains Amoxicillin].
+      {"- **Safe Alternatives:** [List 1-2 allergen-free safe alternatives from evidence]" if asked_for_alternatives else ""}
     - If SAFE for their profile:
-      - **Guidance:** [Direct factual answer to what was asked]
+      - Answer the question directly, accurately, and concisely.
+      - Mention profile safety directly and naturally in 1 short sentence without robotic canned templates (e.g. "Safe for your profile: No conflict with your condition or allergies").
+      - NEVER use repetitive robotic boilerplate sentences.
       {"- **Alternative Brands:** [List substitutes from database]" if asked_for_alternatives else ""}
-      - **Profile Safety:** [1 short confirmation that no known interaction exists with their saved medications/allergies]
 """
     else:  # guest
         mode_instructions = f"""
