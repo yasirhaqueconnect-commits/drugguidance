@@ -14,6 +14,11 @@ DATABASE_URL = os.getenv(
     "postgresql://neondb_owner:npg_LrNx2k0CHFzw@ep-polished-frost-b59s942x-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require"
 )
 
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
