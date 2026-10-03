@@ -57,9 +57,13 @@ def generate_medical_response(
     if role_mode == "pharmacist":
         mode_instructions = """
 - MODE: PHARMACIST WORKSPACE
-  * Target audience is a licensed healthcare professional.
-  * Provide high-precision, peer-level pharmacology data (mechanisms of action, formulation equivalents, pharmacokinetics, cross-sensitivities).
-  * NEVER output preachy disclaimers or say 'consult a doctor' — provide objective clinical data suitable for professional clinical review.
+  * Target audience is a licensed healthcare professional / clinical pharmacist.
+  * Answer strictly what was asked, concisely and accurately based on the verified evidence records.
+  * Keep answers crisp, direct, and to the point — do NOT provide lengthy essays, disclaimers, or unsolicited warnings.
+  * For Alternatives & Brand Substitutes: Provide direct 1-line list of exact brand equivalents from the database.
+  * For Dosages & Formulations: Provide exact dosage figures, strengths, and timing in concise bullets.
+  * For Drug Interactions: State the clinical interaction and pharmacodynamic/pharmacokinetic risk directly in 1-2 factual sentences.
+  * NEVER output disclaimers or say 'consult a doctor' or 'Doctor consultation required'.
 """
     elif role_mode == "user":
         mode_instructions = f"""
