@@ -412,12 +412,30 @@ def create_conversation(
         "updated_at": new_conv.updated_at.isoformat()
     }
 
-def _lookup_conversation(conv_id: int, db: Session):
-    """Finds conversation and returns (conv, model_name, message_model)"""
+def _lookup_conversation(conv_id: int, db: Session, current_user: Optional[Any] = None):
+    """Finds conversation and returns (conv, model_name, message_model) accurately per role/caller."""
+    if current_user:
+        u_role = getattr(current_user, "role", None)
+        if u_role == "pharmacist":
+            pc = db.query(PharmacistConversation).filter(PharmacistConversation.id == conv_id).first()
+            if pc:
+                return pc, "pharmacist", PharmacistMessage
+        elif u_role == "user":
+            uc = db.query(UserConversation).filter(UserConversation.id == conv_id).first()
+            if uc:
+                return uc, "user", UserMessage
+
+    # Heuristic if caller token not passed: check if pharmacist note exists or pharmacist conversation matches
+    pc = db.query(PharmacistConversation).filter(PharmacistConversation.id == conv_id).first()
+    if pc:
+        # If user also exists with same ID, check if pharmacist notes exist
+        has_pharma_notes = db.query(PharmacistNote).filter(PharmacistNote.conversation_id == conv_id).first()
+        if has_pharma_notes:
+            return pc, "pharmacist", PharmacistMessage
+
     uc = db.query(UserConversation).filter(UserConversation.id == conv_id).first()
     if uc:
         return uc, "user", UserMessage
-    pc = db.query(PharmacistConversation).filter(PharmacistConversation.id == conv_id).first()
     if pc:
         return pc, "pharmacist", PharmacistMessage
     gc = db.query(GuestConversation).filter(GuestConversation.id == conv_id).first()
@@ -426,8 +444,8 @@ def _lookup_conversation(conv_id: int, db: Session):
     return None, None, None
 
 @app.get("/conversations/{conv_id}")
-def get_conversation_messages(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, MsgModel = _lookup_conversation(conv_id, db)
+def get_conversation_messages(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, MsgModel = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
@@ -467,16 +485,16 @@ def get_conversation_messages(conv_id: int, db: Session = Depends(get_db)):
     }
 
 @app.delete("/conversations/{conv_id}")
-def delete_conversation(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, _ = _lookup_conversation(conv_id, db)
+def delete_conversation(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, _ = _lookup_conversation(conv_id, db, current_user)
     if conv:
         db.delete(conv)
         db.commit()
     return {"status": "deleted"}
 
 @app.patch("/conversations/{conv_id}/rename")
-def rename_conversation(conv_id: int, req: RenameConversationReq, db: Session = Depends(get_db)):
-    conv, role, _ = _lookup_conversation(conv_id, db)
+def rename_conversation(conv_id: int, req: RenameConversationReq, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, _ = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     conv.title = req.title.strip()
@@ -484,8 +502,8 @@ def rename_conversation(conv_id: int, req: RenameConversationReq, db: Session = 
     return {"status": "renamed", "title": conv.title}
 
 @app.post("/conversations/{conv_id}/bookmark")
-def toggle_bookmark(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, _ = _lookup_conversation(conv_id, db)
+def toggle_bookmark(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, _ = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     if hasattr(conv, "is_bookmarked"):
@@ -534,8 +552,8 @@ def add_note(
     return {"id": n.id, "note": n.note, "created_at": n.created_at.isoformat()}
 
 @app.get("/conversations/{conv_id}/details")
-def get_conv_details(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, MsgModel = _lookup_conversation(conv_id, db)
+def get_conv_details(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, MsgModel = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
@@ -601,8 +619,8 @@ def get_conv_details(conv_id: int, db: Session = Depends(get_db)):
     }
 
 @app.get("/conversations/{conv_id}/export/csv")
-def export_csv(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, MsgModel = _lookup_conversation(conv_id, db)
+def export_csv(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, MsgModel = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
     msgs = db.query(MsgModel).filter(MsgModel.conversation_id == conv_id).order_by(MsgModel.id.asc()).all()
@@ -775,8 +793,8 @@ def build_conversation_pdf(conv_id: int, conv: Any, role: str, msgs: list, notes
     return buffer.getvalue()
 
 @app.get("/conversations/{conv_id}/export/pdf")
-def export_pdf(conv_id: int, db: Session = Depends(get_db)):
-    conv, role, MsgModel = _lookup_conversation(conv_id, db)
+def export_pdf(conv_id: int, current_user: Optional[Any] = Depends(get_current_user_optional), db: Session = Depends(get_db)):
+    conv, role, MsgModel = _lookup_conversation(conv_id, db, current_user)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
