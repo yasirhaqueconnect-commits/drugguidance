@@ -54,17 +54,20 @@ def generate_medical_response(
             f"- Pregnancy Status: {pregnancy}"
         )
 
+    query_lower = query.lower()
+    asked_for_alternatives = any(w in query_lower for w in ["alternative", "substitute", "replace", "instead", "another brand", "other brand", "other medicine", "swap"])
+
     mode_instructions = ""
     if role_mode == "pharmacist":
-        mode_instructions = """
+        mode_instructions = f"""
 - MODE: PHARMACIST WORKSPACE
   * Target audience is a licensed healthcare professional / clinical pharmacist.
   * Answer strictly what was asked, concisely and accurately based on the verified evidence records.
   * Keep answers crisp, direct, and to the point — do NOT provide lengthy essays, disclaimers, or unsolicited warnings.
-  * For Alternatives & Brand Substitutes: Provide direct 1-line list of exact brand equivalents from the database.
+  {"* User specifically asked for alternatives: Provide the direct 1-line list of exact brand equivalents from the database." if asked_for_alternatives else "* User did NOT ask for alternatives: Do NOT list any alternative brands or substitutes."}
   * For Dosages & Formulations: Provide exact dosage figures, strengths, and timing in concise bullets.
   * For Drug Interactions: State the clinical interaction and pharmacodynamic/pharmacokinetic risk directly in 1-2 factual sentences.
-  * NEVER output disclaimers or say 'consult a doctor' or 'Doctor consultation required'.
+  * NEVER output disclaimers or say 'consult a doctor' or 'Doctor consultation required' or 'Note:'.
 """
     elif role_mode == "user":
         mode_instructions = f"""
@@ -73,20 +76,22 @@ def generate_medical_response(
   * Evaluate the inquiry strictly against the patient's personal profile (Allergies, Medications, Age, Conditions):
     - If a CONFLICT or CONTRAINDICATION is found (e.g. allergy match or interaction with ongoing meds):
       Warning: Not safe for your profile. [Direct 1-line reason: e.g. You are allergic to Penicillin, and Augmentin contains Amoxicillin].
-      - **Safe Alternatives:** [Allergen-free/safe alternatives from evidence]
+      {"- **Safe Alternatives:** [List 1-2 allergen-free safe alternatives from evidence]" if asked_for_alternatives else "(Do NOT list alternative medicines because the user did not ask for them)."}
       - **Action:** [Consult your doctor for a prescription]
     - If SAFE for their profile:
-      - **Guidance:** [Direct factual answer]
+      - **Guidance:** [Direct factual answer to what was asked]
+      {"- **Alternative Brands:** [List substitutes from database]" if asked_for_alternatives else ""}
       - **Profile Safety:** [1 short confirmation that no known interaction exists with their saved medications/allergies]
 """
     else:  # guest
-        mode_instructions = """
+        mode_instructions = f"""
 - MODE: GUEST / PUBLIC CLINICAL INQUIRY
   * Answer directly, concisely, and factually based on the verified evidence records.
-  * For Direct Inquiries (Alternatives, Brand Substitutes, Indications, Formulations, Dosages):
-    - **Guidance:** [Direct factual answer based on the database]
-    - Do NOT append boilerplate disclaimers (e.g., do NOT add generic 'These medications are prescription-only; consult a doctor' notes on standard lookups).
-    - ONLY add a second bullet point if the evidence specifically mentions a clinically significant precaution (e.g., food requirements, black box warning, or specific organ contraindication).
+  * Answer ONLY what was specifically asked:
+    - If asked for dosage, provide dosage only.
+    - If asked for interaction, provide interaction only.
+    {"- User specifically asked for alternatives: Provide the alternative brands/substitutes from the database." if asked_for_alternatives else "- User did NOT ask for alternatives: Do NOT list any alternatives or substitutes."}
+  * NEVER output 'Note:', boilerplate disclaimers, or preachy filler.
   * If the user asks dangerous medical advice or proposes hazardous self-medication:
     Warning: Doctor consultation required. [Direct 1-line clinical risk reason].
 """
@@ -97,11 +102,12 @@ CORE PRINCIPLES:
 1. Respond strictly in clear ENGLISH only.
 2. Zero emojis, icons, or logos (no ⚠️, 🚨, etc.).
 3. Direct & Concise: Answer what the user specifically asked without preachy filler, unsolicited boilerplate, or 'Note:' commentary.
-4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain (e.g. NEVER say 'Note: The evidence provided lists...').
-5. Medication / Treatment Inquiries for Conditions (e.g. 'suggest medicine for high blood pressure', 'fever', 'acidity', 'infection'):
+4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain across any portal (NEVER say 'Note: The evidence provided lists...').
+5. NO UNSOLICITED ALTERNATIVES: ONLY provide alternative medicines, brands, or substitutes IF the user specifically asked for them. If the user did NOT ask for alternatives, do NOT list alternatives or substitutes.
+6. Medication / Treatment Inquiries for Conditions (e.g. 'suggest medicine for high blood pressure', 'fever', 'acidity', 'infection'):
    - Provide recommended therapeutic agents / first-line classes from the database or evidence.
    - Do NOT output contraindicated or negative drug pairs unless the user explicitly asked about interactions or what to avoid!
-6. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
+7. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
 
 {mode_instructions}
 """
@@ -145,8 +151,13 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
             answer = f"Evidence Records:\n{context_str}"
             used_model = "direct_evidence"
 
-    # Universal strip of any trailing "Note:..." or "**Note:**..." meta-commentary
+    # Universal strip of any "Note:..." or "**Note:**..." meta-commentary anywhere in the answer
     answer = re.sub(r'(?:\n+|^)\s*(?:\*\*)?Note:?\s*(?:\*\*)?.*$', '', answer, flags=re.DOTALL | re.IGNORECASE).strip()
+    answer = re.sub(r'(?:\n+|^)\s*(?:\*\*)?Note:?\s*(?:\*\*)?[^\n]*', '', answer, flags=re.IGNORECASE).strip()
+
+    # If the user did not ask for alternatives, strip any unsolicited alternatives section
+    if not asked_for_alternatives:
+        answer = re.sub(r'(?:\n+|^)\s*[-*•]?\s*(?:\*\*)?(?:Safe\s+)?Alternatives?:?(?:\*\*)?.*?(?=\n\s*[-*•]?\s*(?:\*\*)?[A-Z]|\Z)', '', answer, flags=re.DOTALL | re.IGNORECASE).strip()
 
     # Detect safety alerts
     safety_alert = any(w in answer.lower() for w in ["warning:", "contraindicated", "avoid using together", "allergic reaction"])
