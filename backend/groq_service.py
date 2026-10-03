@@ -71,17 +71,19 @@ RULES:
        - **Guidance:** [Direct dosage or treatment answer tailored to their age/profile]
        - **Profile Safety:** [1 short line confirming it has no known interaction with their ongoing meds/allergies]
 
-3. GUEST MODE (PUBLIC CLINICAL INQUIRIES):
+3. FACTUAL INQUIRIES & CLINICAL QUESTIONS (ALL ROLES & GUESTS):
    - Never start with a greeting or self-introduction when answering a medical query.
-   - Always structure EVERY clinical answer in 2 to 3 consistent, clear bullet points:
-     * If safety concern, self-medication risk, or prescription-only medication:
-       Warning: Doctor consultation required. [Direct 1-line reason: e.g. Norvasc is a prescription medication for hypertension].
-       - **Risks:** [Key risks, dangerous drops in blood pressure, or adverse side effects from self-medicating]
-       - **Action:** [Consult a qualified physician or healthcare provider for a proper prescription and dosage]
-     * If general inquiry, dosage, or alternatives:
-       - **Guidance:** [Direct factual answer about the medicine, indication, standard dosage, or alternatives]
-       - **Important Note:** [Key precaution, food timing, or doctor consultation recommendation]
-   - NEVER output a solid unformatted paragraph wall of text. Always maintain consistent bullet points with bold prefixes.
+   - For factual queries (e.g. alternatives, brand substitutes, indications, mechanism, classifications):
+     * - **Guidance:** [Direct, accurate answer listing brand alternatives, generic active ingredients, or indications from the evidence].
+     * If there is an essential pharmacological detail (e.g. combination with Clavulanic Acid, extended release), state it succinctly.
+     * Do NOT attach generic, repetitive disclaimers such as "These medications are prescription-only; consult a qualified physician". Only answer the requested factual information.
+   - For dosage and administration queries:
+     * - **Guidance:** [Standard adult/pediatric dosage and frequency from evidence].
+     * - **Precautions:** [Specific clinical rule from evidence, e.g. take after meals, max daily dose, or alcohol avoidance. Do NOT add generic filler].
+   - For drug-drug interactions, self-medication dangers, or high-risk conflicts:
+     * Warning: Doctor consultation required. [Direct 1-line reason identifying the interacting drugs or clinical risk].
+     * - **Risks:** [Key physiological risks, adverse reactions, or toxicity].
+     * - **Action:** [Safe alternative approach or clinical monitoring recommendation].
 
 4. LANGUAGE & FORMATTING:
    - Respond strictly in clear ENGLISH only.
@@ -129,6 +131,16 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
         except Exception as e2:
             answer = f"Evidence Records:\n{context_str}"
             used_model = "direct_evidence"
+
+    # Intelligent cleanup: Remove redundant generic boilerplate disclaimers from routine factual inquiries
+    if not any(w in answer.lower() for w in ["warning:", "contraindicated", "fatal", "emergency"]):
+        import re
+        canned_disclaimers = [
+            r'^\s*[-*•]?\s*\*\*(?:Important Note|Note):\*\*\s*(?:These medications are prescription-only[^\n]*|Consult a (?:qualified )?physician[^\n]*|Please consult[^\n]*)\s*$',
+            r'^\s*[-*•]?\s*\*\*(?:Important Note|Note):\*\*\s*.*(?:prescription-only|consult a qualified physician).*\s*$'
+        ]
+        for pat in canned_disclaimers:
+            answer = re.sub(pat, '', answer, flags=re.IGNORECASE | re.MULTILINE).strip()
 
     # Detect safety alerts
     safety_alert = any(w in answer.lower() for w in ["warning:", "contraindicated", "avoid using together", "allergic reaction"])
