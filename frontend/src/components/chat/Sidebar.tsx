@@ -541,16 +541,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <button
               onClick={onOpenProfile}
-              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer shadow-sm ${
-                isLight
+              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer shadow-sm ${isLight
                   ? "bg-teal-50 hover:bg-teal-100 text-teal-900 border-teal-200"
                   : "bg-teal-950/60 hover:bg-teal-900/80 text-teal-200 border-teal-800"
-              }`}
+                }`}
               title="Open Profile"
             >
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                isLight ? "bg-teal-600 text-white" : "bg-teal-500/20 text-teal-400"
-              }`}>
+              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isLight ? "bg-teal-600 text-white" : "bg-teal-500/20 text-teal-400"
+                }`}>
                 <UserIcon className="w-3.5 h-3.5" />
               </div>
               <span className="truncate">Profile ({user.full_name})</span>
@@ -563,11 +561,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <Link
               href="/"
-              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm ${
-                isLight
+              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm ${isLight
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200"
                   : "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800"
-              }`}
+                }`}
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Home</span>
