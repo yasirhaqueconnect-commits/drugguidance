@@ -271,7 +271,7 @@ function PharmacistChatContent() {
   const activeConvObj = conversations.find((c) => c.id === (noteConvId || activeConversationId));
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] w-full overflow-hidden">
+    <div className="fixed inset-0 h-[100dvh] max-h-[100dvh] w-full flex overflow-hidden overscroll-none">
       {/* Original PharmRAG 2-Column Sidebar */}
       <Sidebar
         conversations={conversations}

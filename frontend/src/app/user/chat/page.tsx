@@ -225,7 +225,7 @@ function UserChatContent() {
   };
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] w-full flex overflow-hidden">
+    <div className="fixed inset-0 h-[100dvh] max-h-[100dvh] w-full flex overflow-hidden overscroll-none">
       {/* Left Sidebar */}
       <Sidebar
         conversations={conversations}

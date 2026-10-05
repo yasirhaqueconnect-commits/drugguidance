@@ -498,13 +498,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      {/* Messages Scroll Area with fixed top/bottom padding so messages NEVER hide behind header */}
+      {/* Messages Scroll Area with contained overscroll so body never shifts */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-3 sm:px-6 lg:px-8 py-3 sm:py-6 z-10 custom-scrollbar touch-pan-y"
-        style={{ WebkitOverflowScrolling: "touch" }}
+        className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-3 sm:px-6 lg:px-8 py-3 sm:py-6 z-10 custom-scrollbar overscroll-contain touch-pan-y"
+        style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}
       >
-        <div className="max-w-3xl mx-auto w-full space-y-6 pt-2 sm:pt-6 pb-28 sm:pb-8 min-h-[calc(100%+80px)] touch-pan-y">
+        <div className="max-w-3xl mx-auto w-full space-y-6 pt-2 sm:pt-6 pb-6 touch-pan-y">
           {loadingHistory ? (
             /* YouTube / ChatGPT-style Theme-Adaptive Skeleton Loader (matching Screenshot 3) */
             <div className="w-full space-y-6 animate-pulse max-w-3xl mx-auto py-6">

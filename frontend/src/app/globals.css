@@ -5,6 +5,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap");
 
 @layer base {
+  html, body {
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+  }
   body {
     font-family: "Poppins", sans-serif;
     @apply bg-white text-[#102650] antialiased selection:bg-teal-500 selection:text-white;
