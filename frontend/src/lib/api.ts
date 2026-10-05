@@ -1,3 +1,24 @@
+/**
+ * Drug Guidance Clinical API Client.
+ * Enterprise HTTP client with token handling, guest session isolation, and strict TypeScript types.
+ */
+
+import {
+  User,
+  UserProfile,
+  UserProfileUpdatePayload,
+  PharmacistProfileUpdatePayload,
+  AuthResponse,
+  UserSignupPayload,
+  PharmacistSignupPayload,
+  LoginPayload,
+  ChatResponsePayload,
+  ConversationSummary,
+  ConversationHistoryDetail,
+  ClinicalNote,
+  ConversationAuditDossier
+} from "@/types";
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
@@ -11,20 +32,20 @@ export function getAuthToken(): string | null {
   return null;
 }
 
-export function setAuthToken(token: string) {
+export function setAuthToken(token: string): void {
   if (typeof window !== "undefined") {
     localStorage.setItem("token", token);
   }
 }
 
-export function clearAuthToken() {
+export function clearAuthToken(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("token");
     localStorage.removeItem("user_info");
   }
 }
 
-async function request(endpoint: string, options: RequestInit = {}) {
+async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -50,9 +71,11 @@ async function request(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
-// Guest-specific request that NEVER sends the auth token,
-// preventing logged-in user profile data from leaking into guest sessions
-async function guestRequest(endpoint: string, options: RequestInit = {}) {
+/**
+ * Guest-specific request that NEVER sends the auth token,
+ * preventing logged-in user profile data from leaking into guest sessions.
+ */
+async function guestRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
@@ -73,7 +96,7 @@ async function guestRequest(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
-async function downloadFile(endpoint: string, fallbackFilename: string) {
+async function downloadFile(endpoint: string, fallbackFilename: string): Promise<void> {
   const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) {
@@ -102,20 +125,34 @@ async function downloadFile(endpoint: string, fallbackFilename: string) {
 }
 
 export const api = {
-  // Auth
-  userSignup: (data: any) => request("/auth/user/signup", { method: "POST", body: JSON.stringify(data) }),
-  userLogin: (data: any) => request("/auth/user/login", { method: "POST", body: JSON.stringify(data) }),
-  pharmacistSignup: (data: any) => request("/auth/pharmacist/signup", { method: "POST", body: JSON.stringify(data) }),
-  pharmacistLogin: (data: any) => request("/auth/pharmacist/login", { method: "POST", body: JSON.stringify(data) }),
-  getMe: () => request("/auth/me", { method: "GET" }),
+  // Authentication
+  userSignup: (data: UserSignupPayload): Promise<AuthResponse> =>
+    request<AuthResponse>("/auth/user/signup", { method: "POST", body: JSON.stringify(data) }),
+
+  userLogin: (data: LoginPayload): Promise<AuthResponse> =>
+    request<AuthResponse>("/auth/user/login", { method: "POST", body: JSON.stringify(data) }),
+
+  pharmacistSignup: (data: PharmacistSignupPayload): Promise<AuthResponse> =>
+    request<AuthResponse>("/auth/pharmacist/signup", { method: "POST", body: JSON.stringify(data) }),
+
+  pharmacistLogin: (data: LoginPayload): Promise<AuthResponse> =>
+    request<AuthResponse>("/auth/pharmacist/login", { method: "POST", body: JSON.stringify(data) }),
+
+  getMe: (): Promise<User> =>
+    request<User>("/auth/me", { method: "GET" }),
 
   // Profiles
-  getMyProfile: () => request("/profile/me", { method: "GET" }),
-  updateUserProfile: (data: any) => request("/profile/user", { method: "PUT", body: JSON.stringify(data) }),
-  updatePharmacistProfile: (data: any) => request("/profile/pharmacist", { method: "PUT", body: JSON.stringify(data) }),
+  getMyProfile: (): Promise<{ profile: UserProfile }> =>
+    request<{ profile: UserProfile }>("/profile/me", { method: "GET" }),
+
+  updateUserProfile: (data: UserProfileUpdatePayload): Promise<{ status: string; message: string }> =>
+    request<{ status: string; message: string }>("/profile/user", { method: "PUT", body: JSON.stringify(data) }),
+
+  updatePharmacistProfile: (data: PharmacistProfileUpdatePayload): Promise<{ status: string; message: string }> =>
+    request<{ status: string; message: string }>("/profile/pharmacist", { method: "PUT", body: JSON.stringify(data) }),
 
   // Conversations & History
-  getConversations: (params?: { q?: string; bookmarked?: boolean; category?: string; sort?: string }) => {
+  getConversations: (params?: { q?: string; bookmarked?: boolean; category?: string; sort?: string }): Promise<any> => {
     const queryParts: string[] = [];
     if (params?.q) queryParts.push(`q=${encodeURIComponent(params.q)}`);
     if (params?.bookmarked) queryParts.push(`bookmarked=true`);
@@ -123,39 +160,56 @@ export const api = {
     if (params?.sort) queryParts.push(`sort=${encodeURIComponent(params.sort)}`);
 
     const queryString = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
-    return request(`/conversations${queryString}`, { method: "GET" });
+    return request<any>(`/conversations${queryString}`, { method: "GET" });
   },
-  createConversation: (title?: string, category?: string) =>
-    request("/conversations", { method: "POST", body: JSON.stringify({ title, category }) }),
-  getConversationMessages: (id: number) => request(`/conversations/${id}`, { method: "GET" }),
-  deleteConversation: (id: number) => request(`/conversations/${id}`, { method: "DELETE" }),
-  renameConversation: (id: number, title: string) =>
-    request(`/conversations/${id}/rename`, { method: "PATCH", body: JSON.stringify({ title }) }),
 
-  // Pharmacist Conversation Management
-  toggleBookmark: (id: number) => request(`/conversations/${id}/bookmark`, { method: "POST" }),
-  getNotes: (id: number) => request(`/conversations/${id}/notes`, { method: "GET" }),
-  addNote: (id: number, note: string) => request(`/conversations/${id}/notes`, { method: "POST", body: JSON.stringify({ note }) }),
-  getConversationDetails: (id: number) => request(`/conversations/${id}/details`, { method: "GET" }),
-  exportPDF: (id: number) => downloadFile(`/conversations/${id}/export/pdf`, `pharmacist_report_conv_${id}.pdf`),
-  exportCSV: (id: number) => downloadFile(`/conversations/${id}/export/csv`, `pharmacist_report_conv_${id}.csv`),
+  createConversation: (title?: string, category?: string): Promise<ConversationSummary> =>
+    request<ConversationSummary>("/conversations", { method: "POST", body: JSON.stringify({ title, category }) }),
 
-  // Chat RAG query
-  sendChatMessage: (message: string, conversationId?: number | null) =>
-    request("/api/chat", {
+  getConversationMessages: (id: number): Promise<ConversationHistoryDetail> =>
+    request<ConversationHistoryDetail>(`/conversations/${id}`, { method: "GET" }),
+
+  deleteConversation: (id: number): Promise<{ status: string }> =>
+    request<{ status: string }>(`/conversations/${id}`, { method: "DELETE" }),
+
+  renameConversation: (id: number, title: string): Promise<{ status: string; title: string }> =>
+    request<{ status: string; title: string }>(`/conversations/${id}/rename`, { method: "PATCH", body: JSON.stringify({ title }) }),
+
+  // Pharmacist Clinical Audits & Notes
+  toggleBookmark: (id: number): Promise<{ status: string; is_bookmarked: boolean }> =>
+    request<{ status: string; is_bookmarked: boolean }>(`/conversations/${id}/bookmark`, { method: "POST" }),
+
+  getNotes: (id: number): Promise<ClinicalNote[]> =>
+    request<ClinicalNote[]>(`/conversations/${id}/notes`, { method: "GET" }),
+
+  addNote: (id: number, note: string): Promise<ClinicalNote> =>
+    request<ClinicalNote>(`/conversations/${id}/notes`, { method: "POST", body: JSON.stringify({ note }) }),
+
+  getConversationDetails: (id: number): Promise<ConversationAuditDossier> =>
+    request<ConversationAuditDossier>(`/conversations/${id}/details`, { method: "GET" }),
+
+  exportPDF: (id: number): Promise<void> =>
+    downloadFile(`/conversations/${id}/export/pdf`, `pharmacist_report_conv_${id}.pdf`),
+
+  exportCSV: (id: number): Promise<void> =>
+    downloadFile(`/conversations/${id}/export/csv`, `pharmacist_report_conv_${id}.csv`),
+
+  // Clinical Assistant RAG Query
+  sendChatMessage: (message: string, conversationId?: number | null): Promise<ChatResponsePayload> =>
+    request<ChatResponsePayload>("/api/chat", {
       method: "POST",
       body: JSON.stringify({ message, conversation_id: conversationId }),
     }),
 
-  // Guest chat - explicitly skips auth token so user profile never leaks into guest sessions
-  sendGuestChatMessage: (message: string, conversationId?: number | null) =>
-    guestRequest("/api/chat", {
+  // Guest Chat - explicitly skips auth token so user profile never leaks into guest sessions
+  sendGuestChatMessage: (message: string, conversationId?: number | null): Promise<ChatResponsePayload> =>
+    guestRequest<ChatResponsePayload>("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+      body: JSON.stringify({ message, conversation_id: conversationId, role: "guest" }),
     }),
 
   // File Upload
-  uploadDocument: (formData: FormData) =>
+  uploadDocument: (formData: FormData): Promise<any> =>
     request("/api/upload", {
       method: "POST",
       body: formData,

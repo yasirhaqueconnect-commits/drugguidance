@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/Navbar";
+import { Navbar } from "@/components";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getAuthToken } from "@/lib/api";
 import { History, MessageSquare, Trash2, ArrowRight, Calendar, Stethoscope, Sparkles } from "lucide-react";
@@ -35,7 +35,7 @@ export default function PharmacistChatHistoryPage() {
         api.getMe(),
         api.getConversations()
       ]);
-      if (userData.role !== "PHARMACIST") {
+      if (userData?.role?.toLowerCase() !== "pharmacist") {
         router.push("/user/chat/history");
         return;
       }

@@ -27,7 +27,8 @@ import {
   PanelLeft,
   Star,
   Copy,
-  Check
+  Check,
+  ArrowLeft
 } from "lucide-react";
 import { api, clearAuthToken } from "@/lib/api";
 import { useTheme } from "@/context/ThemeContext";
@@ -411,7 +412,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             )}
 
             {/* Active Conversation Title Header Info */}
-            {activeConversationTitle && messages.length > 0 && (
+            {activeConversationTitle && messages.length > 0 ? (
               <div className="overflow-hidden">
                 <div className="flex items-center gap-2">
                   <h2 className="font-extrabold text-sm tracking-tight truncate max-w-xs sm:max-w-md">
@@ -433,6 +434,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   </p>
                 )}
               </div>
+            ) : (
+              <span className="font-extrabold text-sm tracking-tight">
+                DrugGuide AI
+              </span>
             )}
           </div>
 

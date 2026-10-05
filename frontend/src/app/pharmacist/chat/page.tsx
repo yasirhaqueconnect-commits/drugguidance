@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { Sidebar } from "@/components/Sidebar";
-import { ChatArea } from "@/components/ChatArea";
-import { PharmacistNoteModal } from "@/components/PharmacistNoteModal";
-import { ConversationDetailsDrawer } from "@/components/ConversationDetailsDrawer";
-import { RenameConversationModal } from "@/components/RenameConversationModal";
+import {
+  Sidebar,
+  ChatArea,
+  PharmacistNoteModal,
+  ConversationDetailsDrawer,
+  RenameConversationModal,
+} from "@/components";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getAuthToken, clearAuthToken } from "@/lib/api";
 import { formatMessageTimestamp } from "@/lib/dateUtils";

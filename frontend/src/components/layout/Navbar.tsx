@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const isPharmacist = user?.role === "PHARMACIST";
+  const isPharmacist = user?.role?.toLowerCase() === "pharmacist";
 
   return (
     <header

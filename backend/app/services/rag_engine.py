@@ -1,6 +1,16 @@
+import os
+import sys
 import re
 from typing import List, Dict, Any, Optional
-from data_loader import get_stored_chunks
+
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+try:
+    from app.services.data_loader import get_stored_chunks
+except ImportError:
+    from data_loader import get_stored_chunks
 
 class FastMedicalRAG:
     def __init__(self):
@@ -64,14 +74,17 @@ class FastMedicalRAG:
         is_allergy_query = any(w in norm_query for w in ["allergic", "allergy", "rash", "reaction", "sensitiz", "safe"])
         is_treatment_query = any(w in norm_query for w in ["suggest", "recommend", "medicine for", "drug for", "treatment", "what to take", "what can i take", "treatment for"])
 
-        # Profile context tokens (allergies & current meds)
+        # Profile context tokens (allergies, current meds, medical conditions)
         profile_allergies = []
         profile_meds = []
+        profile_conditions = []
         if user_profile:
             if user_profile.get("allergies"):
                 profile_allergies = self._tokenize(str(user_profile.get("allergies")))
             if user_profile.get("current_medications"):
                 profile_meds = self._tokenize(str(user_profile.get("current_medications")))
+            if user_profile.get("medical_conditions"):
+                profile_conditions = self._tokenize(str(user_profile.get("medical_conditions")))
 
         # Symptom and Condition mapping to dataset keywords
         symptom_map = {
@@ -150,6 +163,10 @@ class FastMedicalRAG:
                 kw_lower = chunk.get("keywords", "")
                 if any(pm in kw_lower for pm in profile_meds if len(pm) > 3):
                     score += 10.0
+            if profile_conditions and chunk["category"] in ["interaction", "contraindication"]:
+                kw_lower = chunk.get("keywords", "")
+                if any(pc in kw_lower for pc in profile_conditions if len(pc) > 3):
+                    score += 8.0
 
             # Category filter if explicitly provided
             if category and chunk["category"] != category:

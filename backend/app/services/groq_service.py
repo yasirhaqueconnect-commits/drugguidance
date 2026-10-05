@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 client = Groq(api_key=GROQ_API_KEY)
 
-MODEL_NAME = "openai/gpt-oss-120b"
-FALLBACK_MODEL = "openai/gpt-oss-20b"
+MODEL_NAME = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+FALLBACK_MODEL = "openai/gpt-oss-120b"
 
 def generate_medical_response(
     query: str,
@@ -44,10 +44,12 @@ def generate_medical_response(
         conditions = user_profile.get("medical_conditions") or "None"
         age = user_profile.get("age") or "Not specified"
         gender = user_profile.get("gender") or "Not specified"
+        height = user_profile.get("height") or "Not specified"
+        weight = user_profile.get("weight") or "Not specified"
         pregnancy = user_profile.get("pregnancy_status") or "Not applicable"
         profile_summary = (
             f"Active Patient Profile to Evaluate:\n"
-            f"- Age: {age} | Gender: {gender}\n"
+            f"- Age: {age} | Gender: {gender} | Height: {height} | Weight: {weight}\n"
             f"- Known Allergies: {allergies}\n"
             f"- Ongoing Medications: {meds}\n"
             f"- Medical Conditions: {conditions}\n"
@@ -71,19 +73,30 @@ def generate_medical_response(
 """
     elif role_mode == "user":
         mode_instructions = f"""
-- MODE: REGISTERED PATIENT (Personal Profile Active)
+- MODE: REGISTERED PATIENT (Personal Health Profile Active)
 {profile_summary}
-  * DYNAMIC CLINICAL REASONING (NO FIXED/CANNED PHRASES):
-    Evaluate the user's question and the specific medicine against the patient's actual profile (Allergies, Medications, Conditions).
-    - If the medicine is NOT SAFE or CONTRAINDICATED:
-      Clearly state why it is not safe by explaining the exact clinical reason derived directly from the user's question, the drug's pharmacology, and their profile (e.g. explain why Augmentin triggers a penicillin allergy, or why an NSAID elevates blood pressure in a hypertensive patient).
-      {"- Safe Alternatives: List 1-2 allergen-free safe alternative medicines from evidence." if asked_for_alternatives else ""}
-    - If the medicine IS SAFE for their profile:
-      Directly answer what was asked (dosage, timing, directions). Conclude naturally with the specific reason it is compatible with their profile (e.g. confirming it does not affect their blood pressure or cause allergic conflict).
-      {"- Alternative Brands: List equivalent brands from the database." if asked_for_alternatives else ""}
+  * MANDATORY PERSONALIZED PROFILE SCANNING & CLINICAL EVALUATION:
+    You MUST rigorously cross-reference the user's inquiry and any referenced medicine against EVERY parameter of their saved patient profile in the background:
+    1. ALLERGIES: Cross-check drug composition/class against their saved allergies (e.g., penicillin/beta-lactams, sulfa, aspirin, NSAIDs). If allergic conflict exists, it is strictly contraindicated.
+    2. MEDICAL CONDITIONS: Cross-check if the medicine exacerbates or is contraindicated with their saved conditions (e.g., NSAIDs in Hypertension, Kidney disease, or Asthma; decongestants in Hypertension).
+    3. CURRENT MEDICATIONS: Cross-check drug-drug interactions between what they ask about and their ongoing medications.
+    4. PREGNANCY & AGE: If pregnancy is indicated, check trimester safety and fetal risk. If pediatric or elderly age is noted, evaluate dosage sensitivity.
+
+  * WARNINGS FORMAT (EXACT SAME AS GUEST & PHARMACIST):
+    If the requested medicine is STRICTLY CONTRAINDICATED with the patient's saved profile (e.g. allergy conflict, pregnancy risk, or exacerbation of their medical condition) OR dangerous self-medication is proposed:
+    Output ONLY the single direct warning line (without extra preamble, so it renders in the amber warning card):
+    Warning: Doctor consultation required. [Direct clinical risk reason naming the specific profile conflict].
+
+  * UNIFIED STRUCTURED LAYOUT (WHEN PERMITTED / CLINICALLY GUIDED):
+    When the medicine is permitted or guidance is safe for their profile, format the response into clean, concise bullets with bold labels matching the exact standard layout:
+    * **Status:** Permitted (or Use With Caution).
+    * **Clinical Guidance & Dosage:** [Accurate dosage, strength, and frequency from verified database records].
+    * **Profile Safety Evaluation:** [Confirm safety against their background profile — explicitly naming their saved conditions, allergies, and ongoing medications].
+    * **Administration:** [Timing instructions, e.g. Take after meals, with water].
+    {"* **Safe Alternative:** [List 1-2 safe alternatives from database that do not conflict with their allergies or conditions]." if asked_for_alternatives else ""}
+
   * ABSOLUTELY FORBIDDEN:
-    - NEVER use generic canned phrases or repetitive formulas like "No known interactions exist with your saved medications or allergies".
-    - Explain the actual clinical reason specific to the medicine and the patient's condition.
+    - NEVER give a generic canned statement like 'No interactions found with your profile'. Always name their actual condition, allergy, or medication specifically to demonstrate real profile awareness.
 """
     else:  # guest
         mode_instructions = f"""
@@ -106,12 +119,29 @@ CORE PRINCIPLES:
 3. Direct & Concise: Answer what the user specifically asked without preachy filler, unsolicited boilerplate, or 'Note:' commentary.
 4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain across any portal (NEVER say 'Note: The evidence provided lists...').
 5. NO UNSOLICITED ALTERNATIVES: ONLY provide alternative medicines, brands, or substitutes IF the user specifically asked for them. If the user did NOT ask for alternatives, do NOT list alternatives or substitutes.
-6. STRICTLY NON-PRESCRIPTION / NO MEDICINE SUGGESTIONS FOR CONDITIONS:
-   - This system is an evidence-based drug information lookup reference only, NOT a prescribing doctor.
-   - The system NEVER suggests, recommends, or prescribes medicines for illnesses, medical conditions, or general symptoms (e.g. if asked 'suggest medicine for high blood pressure', 'what medicine can I take for cough/fever?').
-   - In response to condition-based recommendation requests, state clearly in 1 direct sentence: "This system provides evidence-based information on specific medications and does not suggest or prescribe treatments for medical conditions. Please provide a specific medicine name to check its dosage, interactions, or alternative brands."
-   - When a user asks about a SPECIFIC DRUG by name: Provide verified pharmacological reference data (dosages, timing, interactions, or requested alternative brands) for THAT specific drug only.
+6. SYMPTOMS & CLINICAL INDICATIONS (e.g. fever, headache, pain, acidity, allergy):
+   - When the user asks about symptoms or conditions (e.g. 'I have a fever, what medicine and dose?', 'acidity and heartburn', 'headache'):
+   - Identify the appropriate first-line medicine(s) from the verified evidence records (e.g. Panadol / Paracetamol or Brufen / Ibuprofen for fever/pain; Risek / Omeprazole for acidity; Zyrtec for allergies).
+   - Provide the exact verified adult and/or pediatric dosage, frequency, and timing directly and concisely from the evidence records.
+   - Do NOT refuse to answer common symptoms when the evidence contains verified first-line treatments for them.
 7. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
+8. UNIFIED STRUCTURED FORMATTING (EXCEPT FOR WARNINGS):
+   - Except for doctor warnings, ALWAYS format clinical answers (dosage, intake confirmation, interactions, symptom guidance) into clean, concise bullet points with bold descriptive labels.
+   - For intake / dosage confirmation (e.g. 'Can I take two capsules of omeprazole 20mg per day'):
+     * **Status:** Yes, permitted (or Not recommended).
+     * **Dosage Guidance:** [Explain specific dose, e.g. Maximum daily dose for Omeprazole (Risek) is 40 mg/day, corresponding to two 20 mg capsules].
+     * **Administration:** [e.g. Take 30-60 minutes before meals].
+   - For drug interaction questions:
+     * **Compatibility:** Not recommended / Safe.
+     * **Interaction Severity:** Severe / Moderate (e.g. both are NSAIDs).
+     * **Clinical Risk:** [Specific risk, e.g. Increased stomach ulcers and bleeding].
+   - For symptom & medicine guidance:
+     * **First-Line Medicine:** [Drug name and brand]
+     * **Adult Dosage:** [Dose and frequency]
+     * **Child Dosage:** [Syrup dose if available]
+     * **Administration:** [Timing, e.g. After meal, max daily dose]
+   - SAFETY WARNINGS EXCEPTION: When doctor consultation is required or dangerous self-medication is proposed, output ONLY the single direct warning line without any bullets or extra paragraphs before or after:
+     Warning: Doctor consultation required. [Direct 1-line clinical risk reason].
 
 {mode_instructions}
 """

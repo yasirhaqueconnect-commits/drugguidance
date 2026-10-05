@@ -19,7 +19,9 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
   Bookmark,
-  Pencil
+  Pencil,
+  ArrowLeft,
+  LogIn
 } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -203,9 +205,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <img src="/images/rag-system-logo.png" alt="PharmRAG Logo" className="w-9 h-9 object-contain" />
             </div>
             <div>
-              <h1 className="text-base font-extrabold tracking-tight">{isPharmacist ? "Pharmacist Portal" : "User Portal"}</h1>
-              <p className={`text-[10px] font-semibold ${isPharmacist ? "text-purple-600 dark:text-purple-400" : isLight ? "text-teal-600" : "text-teal-400"}`}>
-                {isPharmacist ? "Pharmacist Workspace" : "User Workspace"}
+              <h1 className="text-base font-extrabold tracking-tight">
+                {isPharmacist ? "Pharmacist Portal" : isGuest ? "Guest Portal" : "User Portal"}
+              </h1>
+              <p className={`text-[10px] font-semibold ${isPharmacist ? "text-purple-600 dark:text-purple-400" : isGuest ? "text-cyan-600 dark:text-cyan-400" : isLight ? "text-teal-600" : "text-teal-400"}`}>
+                {isPharmacist ? "Pharmacist Workspace" : isGuest ? "Instant Clinical Guidance" : "User Workspace"}
               </p>
             </div>
           </div>
@@ -548,6 +552,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <span className="truncate">Profile ({user.full_name})</span>
             </button>
+          </div>
+        )}
+
+        {/* Bottom Guest Action Button: Home */}
+        {isGuest && (
+          <div className={`mt-auto pt-3 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
+            <Link
+              href="/"
+              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold ${
+                isLight
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200 shadow-xs"
+                  : "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800"
+              }`}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Home</span>
+            </Link>
           </div>
         )}
       </aside>

@@ -1,67 +1,76 @@
-import os
+"""
+Authentication & Cryptographic Security Module.
+Provides secure password hashing (bcrypt), signed JWT bearer token issuance, and user session resolution.
+"""
+
 from datetime import datetime, timedelta
-from typing import Optional
-from dotenv import load_dotenv
+from typing import Optional, Any
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from database import get_db, User, Pharmacist
 
-load_dotenv()
-
-import bcrypt
-
-SECRET_KEY = os.getenv("JWT_SECRET", "super_medical_jwt_secret_key_2026_xyz987")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "43200"))
+from app.core.config import settings
+from app.core.database import get_db
 
 security = HTTPBearer(auto_error=False)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plain-text password against a bcrypt hash."""
     try:
         return bcrypt.checkpw(plain_password.encode("utf-8")[:72], hashed_password.encode("utf-8"))
     except Exception:
         return False
 
+
 def get_password_hash(password: str) -> str:
+    """Generates a secure salt and hashes the plain-text password."""
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode("utf-8")[:72], salt).decode("utf-8")
 
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Generates an encrypted JWT access token with expiration timestamp."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
 
 def get_current_user_optional(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
-):
+) -> Optional[Any]:
+    """Resolves authenticated user/pharmacist from Bearer token, or returns None for guest."""
     if not auth or not auth.credentials:
         return None
     try:
-        payload = jwt.decode(auth.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(auth.credentials, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         user_id = payload.get("sub")
         role = payload.get("role")
         if user_id is None:
             return None
     except JWTError:
         return None
-    
+
+    from app.models.pharmacist import Pharmacist
+    from app.models.user import User
+
     if role == "pharmacist":
         return db.query(Pharmacist).filter(Pharmacist.id == int(user_id)).first()
     return db.query(User).filter(User.id == int(user_id)).first()
 
+
 def get_current_user_required(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
-) -> User:
+) -> Any:
+    """Strict dependency requiring a valid authenticated Bearer token."""
     user = get_current_user_optional(auth, db)
     if not user:
         raise HTTPException(

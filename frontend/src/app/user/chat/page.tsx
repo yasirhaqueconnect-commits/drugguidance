@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sidebar } from "@/components/Sidebar";
-import { ChatArea } from "@/components/ChatArea";
-import { UserProfileModal } from "@/components/UserProfileModal";
+import { Sidebar, ChatArea, UserProfileModal } from "@/components";
 import { useTheme } from "@/context/ThemeContext";
 import { api, getAuthToken, clearAuthToken } from "@/lib/api";
 
@@ -68,7 +66,7 @@ function UserChatContent() {
         const p = profRes.value?.profile;
         const isCompleted = Boolean(
           p && (
-            (p.age !== null && p.age !== undefined && p.age !== "") ||
+            (p.age !== null && p.age !== undefined && String(p.age).trim() !== "") ||
             (p.height && p.height.trim()) ||
             (p.weight && p.weight.trim()) ||
             (p.allergies && p.allergies.trim()) ||

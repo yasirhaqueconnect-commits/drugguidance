@@ -4,7 +4,18 @@ import json
 import openpyxl
 from typing import List, Dict, Any
 
-CHUNKS_CACHE_FILE = os.path.join(os.path.dirname(__file__), "chunks_store.json")
+_backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+CHUNKS_CACHE_FILE = os.path.join(_backend_dir, "chunks_store.json")
+
+def _find_files(pattern: str, base_dir: str) -> List[str]:
+    """Finds matching dataset files in base_dir or datasets/ directory."""
+    files = glob.glob(os.path.join(base_dir, pattern))
+    if not files:
+        files = glob.glob(os.path.join(base_dir, "datasets", pattern))
+    if not files:
+        root_data = os.path.abspath(os.path.join(_backend_dir, "..", "datasets"))
+        files = glob.glob(os.path.join(root_data, pattern))
+    return files
 
 def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
     """
@@ -12,14 +23,13 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
     and returns a list of indexed chunk dictionaries.
     """
     if base_dir is None:
-        # Default is parent directory of backend where xlsx files reside
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        base_dir = os.path.abspath(os.path.join(_backend_dir, ".."))
     
     chunks = []
     chunk_id = 1
 
     # 1. Allergy-Based Drug Filtering
-    allergy_files = glob.glob(os.path.join(base_dir, "*ALLERGY*.xlsx"))
+    allergy_files = _find_files("*ALLERGY*.xlsx", base_dir)
     for file_path in allergy_files:
         wb = openpyxl.load_workbook(file_path, read_only=True)
         sheet = wb.active
@@ -71,7 +81,7 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             chunk_id += 1
 
     # 2. Alternative Medicine
-    alt_files = glob.glob(os.path.join(base_dir, "*ALTERNATIVE*.xlsx"))
+    alt_files = _find_files("*ALTERNATIVE*.xlsx", base_dir)
     for file_path in alt_files:
         wb = openpyxl.load_workbook(file_path, read_only=True)
         sheet = wb.active
@@ -121,7 +131,7 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             chunk_id += 1
 
     # 3. Dosage Guidance
-    dosage_files = glob.glob(os.path.join(base_dir, "*Dosage*.xlsx"))
+    dosage_files = _find_files("*Dosage*.xlsx", base_dir)
     for file_path in dosage_files:
         wb = openpyxl.load_workbook(file_path, read_only=True)
         sheet = wb.active
@@ -174,7 +184,7 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             chunk_id += 1
 
     # 4. Drug-Drug Interactions
-    interaction_files = glob.glob(os.path.join(base_dir, "*INTERACTIONS*.xlsx"))
+    interaction_files = _find_files("*INTERACTIONS*.xlsx", base_dir)
     for file_path in interaction_files:
         wb = openpyxl.load_workbook(file_path, read_only=True)
         sheet = wb.active
