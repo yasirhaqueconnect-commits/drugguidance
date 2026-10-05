@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`fixed lg:static inset-y-0 left-0 w-64 lg:w-72 flex flex-col h-screen p-4 shrink-0 transition-all duration-300 border-r z-40 shadow-2xl lg:shadow-none ${isLight ? "bg-white border-slate-200/80 text-slate-800" : "bg-gray-950 border-slate-800 text-slate-100"
+        className={`fixed lg:static inset-y-0 left-0 w-64 lg:w-72 flex flex-col h-[100dvh] max-h-[100dvh] p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] shrink-0 transition-all duration-300 border-r z-40 shadow-2xl lg:shadow-none overflow-hidden select-none ${isLight ? "bg-white border-slate-200/80 text-slate-800" : "bg-gray-950 border-slate-800 text-slate-100"
           }`}
       >
         {/* Brand Header — Restored PharmRAG AI Logo & Identity */}
@@ -337,16 +337,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Guest Mode Notice */}
         {isGuest ? (
-          <div
-            className={`p-3 mb-3 rounded-2xl border text-xs flex items-start gap-2 ${isLight
-              ? "bg-amber-50 border-amber-200 text-amber-900"
-              : "bg-amber-500/10 border-amber-500/20 text-amber-300"
-              }`}
-          >
-            <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <span className="text-[11px] leading-relaxed">
-              Guest mode does not save chat history. Sign in to save past sessions.
-            </span>
+          <div className="flex-1 flex flex-col min-h-0">
+            <div
+              className={`p-3 mb-3 rounded-2xl border text-xs flex items-start gap-2 ${isLight
+                ? "bg-amber-50 border-amber-200 text-amber-900"
+                : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+                }`}
+            >
+              <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <span className="text-[11px] leading-relaxed">
+                Guest mode does not save chat history. Sign in to save past sessions.
+              </span>
+            </div>
+            <div className="flex-1 min-h-0" />
           </div>
         ) : displayedConversations.length === 0 ? (
           <div
@@ -535,13 +538,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom User Medical Profile Button */}
         {user && onOpenProfile && (
-          <div className={`mt-auto pt-3 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
+          <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <button
               onClick={onOpenProfile}
-              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer ${
+              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer shadow-sm ${
                 isLight
-                  ? "bg-teal-50/90 hover:bg-teal-100 text-teal-900 border-teal-200/90 shadow-xs"
-                  : "bg-teal-950/40 hover:bg-teal-900/60 text-teal-200 border-teal-800/60"
+                  ? "bg-teal-50 hover:bg-teal-100 text-teal-900 border-teal-200"
+                  : "bg-teal-950/60 hover:bg-teal-900/80 text-teal-200 border-teal-800"
               }`}
               title="Open Profile"
             >
@@ -557,12 +560,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Guest Action Button: Home */}
         {isGuest && (
-          <div className={`mt-auto pt-3 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
+          <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <Link
               href="/"
-              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold ${
+              className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm ${
                 isLight
-                  ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200 shadow-xs"
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200"
                   : "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800"
               }`}
             >
