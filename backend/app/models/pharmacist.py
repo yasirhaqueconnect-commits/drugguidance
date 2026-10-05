@@ -20,7 +20,6 @@ class Pharmacist(Base):
     full_name = Column(String(255), default="")
     phone = Column(String(50), default="")
     license_number = Column(String(100), default="")
-    pharmacy_organization = Column(String(255), default="Clinical Pharmacy Division")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversations = relationship("PharmacistConversation", back_populates="pharmacist", cascade="all, delete-orphan")
