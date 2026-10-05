@@ -85,63 +85,83 @@ def user_login(req: LoginReq, db: Session = Depends(get_db)):
 @router.post("/pharmacist/signup", summary="Pharmacist Registration")
 def pharmacist_signup(req: PharmacistSignupReq, db: Session = Depends(get_db)):
     """Registers a licensed clinical pharmacist account."""
-    clean_email = req.email.strip().lower()
-    existing = db.query(Pharmacist).filter(Pharmacist.email == clean_email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A pharmacist account with this email already exists."
+    try:
+        clean_email = req.email.strip().lower()
+        existing = db.query(Pharmacist).filter(Pharmacist.email == clean_email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A pharmacist account with this email already exists."
+            )
+
+        new_pharma = Pharmacist(
+            email=clean_email,
+            password_hash=get_password_hash(req.password),
+            role="pharmacist",
+            full_name=req.full_name.strip(),
+            phone=req.phone or "",
+            license_number=req.license_number or ""
         )
+        db.add(new_pharma)
+        db.commit()
+        db.refresh(new_pharma)
 
-    new_pharma = Pharmacist(
-        email=clean_email,
-        password_hash=get_password_hash(req.password),
-        role="pharmacist",
-        full_name=req.full_name.strip(),
-        phone=req.phone or "",
-        license_number=req.license_number or ""
-    )
-    db.add(new_pharma)
-    db.commit()
-    db.refresh(new_pharma)
-
-    token = create_access_token({"sub": str(new_pharma.id), "role": "pharmacist"})
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": new_pharma.id,
-            "email": new_pharma.email,
-            "role": new_pharma.role,
-            "full_name": new_pharma.full_name,
-            "phone": new_pharma.phone
+        token = create_access_token({"sub": str(new_pharma.id), "role": "pharmacist"})
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": new_pharma.id,
+                "email": new_pharma.email,
+                "role": new_pharma.role,
+                "full_name": new_pharma.full_name,
+                "phone": new_pharma.phone
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pharmacist Registration Failed: {str(e)}"
+        )
 
 
 @router.post("/pharmacist/login", summary="Pharmacist Login")
 def pharmacist_login(req: LoginReq, db: Session = Depends(get_db)):
     """Authenticates licensed pharmacist and returns clinical session token."""
-    clean_email = req.email.strip().lower()
-    pharma = db.query(Pharmacist).filter(Pharmacist.email == clean_email).first()
-    if not pharma or not verify_password(req.password, pharma.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password."
-        )
+    try:
+        clean_email = req.email.strip().lower()
+        pharma = db.query(Pharmacist).filter(Pharmacist.email == clean_email).first()
+        if not pharma or not verify_password(req.password, pharma.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password."
+            )
 
-    token = create_access_token({"sub": str(pharma.id), "role": "pharmacist"})
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": pharma.id,
-            "email": pharma.email,
-            "role": pharma.role,
-            "full_name": pharma.full_name,
-            "phone": pharma.phone
+        token = create_access_token({"sub": str(pharma.id), "role": "pharmacist"})
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": pharma.id,
+                "email": pharma.email,
+                "role": pharma.role,
+                "full_name": pharma.full_name,
+                "phone": pharma.phone
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pharmacist Login Failed: {str(e)}"
+        )
 
 
 # ----------------- 3. ACTIVE USER CONTEXT -----------------
