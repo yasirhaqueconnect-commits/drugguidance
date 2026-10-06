@@ -21,8 +21,11 @@ class FastMedicalRAG:
 
     def build_index(self):
         for idx, chunk in enumerate(self.chunks):
-            # Tokens from keywords, medicine_name, generic_name, and content
-            raw_text = f"{chunk['keywords']} {chunk['medicine_name']} {chunk['generic_name']}"
+            # Tokens from category, keywords, medicine_name, generic_name, and content
+            cat = chunk.get("category", "")
+            raw_text = f"{cat} {chunk.get('keywords', '')} {chunk.get('medicine_name', '')} {chunk.get('generic_name', '')} {chunk.get('content', '')}"
+            if cat == "dosage":
+                raw_text += " dosage dose doses dosing information administration intake"
             tokens = set(self._tokenize(raw_text))
             for token in tokens:
                 if token not in self.index:
@@ -69,7 +72,7 @@ class FastMedicalRAG:
 
         # Detect specific query intents (interaction, dosage, alternative, allergy, treatment)
         is_interaction_query = any(w in norm_query for w in ["interaction", "together", "take with", "mix", "combine", "interact", "contraindicated"])
-        is_dosage_query = any(w in norm_query for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day"])
+        is_dosage_query = any(w in norm_query for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day", "intake", "timing", "schedule"])
         is_alternative_query = any(w in norm_query for w in ["alternative", "substitute", "replace", "brand", "price", "pkr"])
         is_allergy_query = any(w in norm_query for w in ["allergic", "allergy", "rash", "reaction", "sensitiz", "safe"])
         is_treatment_query = any(w in norm_query for w in ["suggest", "recommend", "medicine for", "drug for", "treatment", "what to take", "what can i take", "treatment for"])
@@ -86,30 +89,7 @@ class FastMedicalRAG:
             if user_profile.get("medical_conditions"):
                 profile_conditions = self._tokenize(str(user_profile.get("medical_conditions")))
 
-        # Symptom and Condition mapping to dataset keywords
-        symptom_map = {
-            "headache": ["paracetamol", "panadol", "ibuprofen", "brufen"],
-            "fever": ["paracetamol", "panadol", "ibuprofen", "brufen", "antipyretic"],
-            "pain": ["paracetamol", "panadol", "ibuprofen", "brufen", "analgesic"],
-            "acidity": ["omeprazole", "risek", "antacid"],
-            "heartburn": ["omeprazole", "risek"],
-            "stomach": ["omeprazole", "risek", "metronidazole", "flagyl"],
-            "vomiting": ["dimenhydrinate", "gravinate"],
-            "nausea": ["dimenhydrinate", "gravinate"],
-            "cough": ["salbutamol", "ventolin"],
-            "asthma": ["salbutamol", "ventolin"],
-            "infection": ["amoxicillin", "augmentin", "azithromycin"],
-            "blood pressure": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
-            "hypertension": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
-            "high bp": ["norvasc", "amlodipine", "tenormin", "atenolol", "cozaar", "losartan", "zestril", "lisinopril", "capoten", "captopril", "adalat", "nifedipine"],
-            "allergy": ["cetirizine", "zyrtec"],
-            "itching": ["cetirizine", "zyrtec"]
-        }
-
         expanded_tokens = [t for t in query_tokens if t not in STOP_WORDS]
-        for sym, mapped_meds in symptom_map.items():
-            if sym in norm_query:
-                expanded_tokens.extend(mapped_meds)
 
         scores: Dict[int, float] = {}
 
@@ -128,31 +108,40 @@ class FastMedicalRAG:
             generic_lower = chunk["generic_name"].lower()
 
             # Exact or substring match on medicine name (excluding stop words)
+            med_matched = False
             for token in query_tokens:
                 if token in STOP_WORDS:
                     continue
                 if len(token) > 3 and token in med_name_lower:
-                    score += 5.0
+                    score += 8.0
+                    med_matched = True
                 if len(token) > 3 and token in generic_lower:
-                    score += 4.0
+                    score += 6.0
+                    med_matched = True
 
             # Multi-word medicine check
             if any(med_part in norm_query for med_part in med_name_lower.split() if len(med_part) > 3 and med_part not in STOP_WORDS):
-                score += 3.0
+                score += 5.0
+                med_matched = True
 
             # Boost category based on intent
             if is_interaction_query and chunk["category"] == "interaction":
-                score += 8.0
-            elif not is_interaction_query and is_treatment_query and chunk["category"] == "interaction":
-                # User asked what to TAKE, do not prioritize interaction warnings
-                score -= 3.0
+                score += 15.0
 
             if is_dosage_query and chunk["category"] == "dosage":
-                score += 6.0
+                score += 18.0
+                if med_matched:
+                    score += 12.0
+
             if is_alternative_query and chunk["category"] == "alternative":
-                score += 6.0
+                score += 15.0
+                if med_matched:
+                    score += 10.0
+
             if is_allergy_query and chunk["category"] == "allergy":
-                score += 6.0
+                score += 15.0
+                if med_matched:
+                    score += 10.0
 
             # Boost if chunk directly addresses the user profile's allergies or medications
             if profile_allergies and chunk["category"] == "allergy":

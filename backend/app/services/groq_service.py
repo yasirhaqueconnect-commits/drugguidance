@@ -119,14 +119,34 @@ CORE PRINCIPLES:
 3. Direct & Concise: Answer what the user specifically asked without preachy filler, unsolicited boilerplate, or 'Note:' commentary.
 4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain across any portal (NEVER say 'Note: The evidence provided lists...').
 5. NO UNSOLICITED ALTERNATIVES: ONLY provide alternative medicines, brands, or substitutes IF the user specifically asked for them. If the user did NOT ask for alternatives, do NOT list alternatives or substitutes.
-6. SYMPTOMS & CLINICAL INDICATIONS (e.g. fever, headache, pain, acidity, allergy):
-   - When the user asks about symptoms or conditions (e.g. 'I have a fever, what medicine and dose?', 'acidity and heartburn', 'headache'):
-   - Identify the appropriate first-line medicine(s) from the verified evidence records (e.g. Panadol / Paracetamol or Brufen / Ibuprofen for fever/pain; Risek / Omeprazole for acidity; Zyrtec for allergies).
-   - Provide the exact verified adult and/or pediatric dosage, frequency, and timing directly and concisely from the evidence records.
-   - Do NOT refuse to answer common symptoms when the evidence contains verified first-line treatments for them.
-7. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
-8. UNIFIED STRUCTURED FORMATTING (EXCEPT FOR WARNINGS):
-   - Except for doctor warnings, ALWAYS format clinical answers (dosage, intake confirmation, interactions, symptom guidance) into clean, concise bullet points with bold descriptive labels.
+6. STRICTLY NON-PRESCRIPTION / NO MEDICINE SUGGESTIONS FOR CONDITIONS:
+   - This system is an evidence-based drug information lookup reference only, NOT a prescribing doctor.
+   - The system NEVER suggests, recommends, or prescribes medicines for illnesses, medical conditions, or general symptoms (e.g. if asked 'suggest medicine for high blood pressure', 'what medicine can I take for fever/cough?', 'what medicine is good for acidity?').
+   - In response to condition-based recommendation requests, state clearly in 1 direct sentence: "This system provides evidence-based information on specific medications and does not suggest or prescribe treatments for medical conditions. Please specify a medicine name to check its dosage, interactions, or alternative brands, or consult a qualified doctor for medical prescriptions."
+   - When a user asks about a SPECIFIC DRUG by name: Provide verified pharmacological reference data (dosages, timing, interactions, or requested alternative brands) for THAT specific drug only.
+7. DOSAGE & INTAKE GUIDANCE:
+   - When the user asks about dosage, administration, or how to take a specific medicine:
+     * Provide the exact verified adult and/or child dosage, timing, and maximum daily limit from the verified evidence records.
+     * In GUEST & PHARMACIST modes, format into clean structured bullets:
+       * **Medicine & Strength:** [Drug name, form, and strength from records, e.g. Panadol 500 mg Tablet]
+       * **Adult Dosage:** [Exact verified adult dose and frequency, e.g. 1 tablet (500 mg) every 6-8 hours]
+       * **Child Dosage:** [Exact pediatric dose from records, e.g. 5 mL syrup (120 mg/5 mL) 2-3 times/day, or Not recommended for children without doctor guidance]
+       * **Maximum Daily Dose:** [Exact max limit per day, e.g. 4 g/day for adults]
+       * **Administration:** [e.g. Take after meals with water]
+   - In REGISTERED PATIENT (User Profile) mode:
+     * If the medicine is safe for their profile, use the UNIFIED STRUCTURED LAYOUT:
+       * **Status:** Permitted (or Use With Caution).
+       * **Clinical Guidance & Dosage:** [Adult dose, child dose, and maximum daily limit].
+       * **Profile Safety Evaluation:** [Confirm safety against their background profile — explicitly naming their saved conditions, allergies, and ongoing medications].
+       * **Administration:** [Timing instructions, e.g. Take after meals, with water].
+     * If the medicine conflicts with their saved profile (e.g. Penicillin allergy with Augmentin):
+       Output ONLY the single direct warning line:
+       Warning: Doctor consultation required. [Direct clinical risk reason naming the specific profile conflict].
+   - If the user asks for dosage information generally without naming any medicine (e.g. 'dosage information'):
+     State directly in 1 friendly sentence: "Please specify the name of the medicine (e.g. Panadol, Brufen, Augmentin, Risek) you would like to check dosage information for."
+8. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
+9. UNIFIED STRUCTURED FORMATTING (EXCEPT FOR WARNINGS):
+   - Except for doctor warnings, ALWAYS format clinical answers (dosage, intake confirmation, interactions) into clean, concise bullet points with bold descriptive labels.
    - For intake / dosage confirmation (e.g. 'Can I take two capsules of omeprazole 20mg per day'):
      * **Status:** Yes, permitted (or Not recommended).
      * **Dosage Guidance:** [Explain specific dose, e.g. Maximum daily dose for Omeprazole (Risek) is 40 mg/day, corresponding to two 20 mg capsules].
@@ -135,11 +155,6 @@ CORE PRINCIPLES:
      * **Compatibility:** Not recommended / Safe.
      * **Interaction Severity:** Severe / Moderate (e.g. both are NSAIDs).
      * **Clinical Risk:** [Specific risk, e.g. Increased stomach ulcers and bleeding].
-   - For symptom & medicine guidance:
-     * **First-Line Medicine:** [Drug name and brand]
-     * **Adult Dosage:** [Dose and frequency]
-     * **Child Dosage:** [Syrup dose if available]
-     * **Administration:** [Timing, e.g. After meal, max daily dose]
    - SAFETY WARNINGS EXCEPTION: When doctor consultation is required or dangerous self-medication is proposed, output ONLY the single direct warning line without any bullets or extra paragraphs before or after:
      Warning: Doctor consultation required. [Direct 1-line clinical risk reason].
 
@@ -156,22 +171,24 @@ USER QUERY:
 
 Understand the user's intent and formulate a helpful, professional answer in English:"""
 
-    try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            max_tokens=650,
-            temperature=0.2
-        )
-        answer = completion.choices[0].message.content.strip()
-        used_model = MODEL_NAME
-    except Exception as e:
+    candidate_models = [
+        MODEL_NAME,
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b"
+    ]
+    # Remove duplicates while preserving order
+    models_to_try = []
+    for m in candidate_models:
+        if m and m not in models_to_try:
+            models_to_try.append(m)
+
+    answer = None
+    used_model = "direct_evidence"
+
+    for m in models_to_try:
         try:
             completion = client.chat.completions.create(
-                model=FALLBACK_MODEL,
+                model=m,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -180,10 +197,31 @@ Understand the user's intent and formulate a helpful, professional answer in Eng
                 temperature=0.2
             )
             answer = completion.choices[0].message.content.strip()
-            used_model = FALLBACK_MODEL
-        except Exception as e2:
-            answer = f"Evidence Records:\n{context_str}"
-            used_model = "direct_evidence"
+            used_model = m
+            break
+        except Exception:
+            continue
+
+    if not answer:
+        # Graceful fallback: build structured response directly from top chunk
+        if chunks:
+            top_c = chunks[0]
+            cat = top_c.get("category", "")
+            med = top_c.get("medicine_name", "Specified Medication")
+            meta = top_c.get("metadata", {})
+            if cat == "dosage":
+                answer = (
+                    f"* **Medicine:** {med}\n"
+                    f"* **Adult Dosage:** {meta.get('adult_dosage', 'Standard therapeutic dose')}\n"
+                    f"* **Child Dosage:** {meta.get('child_dosage', 'Consult pediatrician for age/weight-based dose')}\n"
+                    f"* **Maximum Daily Dose:** {meta.get('max_daily_dose', 'Do not exceed maximum daily limit')}\n"
+                    f"* **Administration:** {meta.get('timing_frequency', 'Take with water as directed')}"
+                )
+            else:
+                answer = top_c.get("content", f"Evidence Record: {med}")
+        else:
+            answer = "This system provides evidence-based information on specific medications. Please specify a medicine name to check its dosage, interactions, or alternative brands."
+        used_model = "direct_evidence"
 
     # Universal strip of any "Note:..." or "**Note:**..." meta-commentary anywhere in the answer
     answer = re.sub(r'(?:\n+|^)\s*(?:\*\*)?Note:?\s*(?:\*\*)?.*$', '', answer, flags=re.DOTALL | re.IGNORECASE).strip()
