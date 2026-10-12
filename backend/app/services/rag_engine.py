@@ -48,12 +48,20 @@ class FastMedicalRAG:
             r"\bpresure\b": "pressure",
             r"\bhypertention\b": "hypertension",
             r"\bheadach\b": "headache",
+            r"\bhedick\b": "headache",
+            r"\bsar\s*dard\b": "headache",
+            r"\bsir\s*dard\b": "headache",
+            r"\bsir\s*me\s*dard\b": "headache",
+            r"\bdard\b": "pain",
             r"\bfevr\b": "fever",
+            r"\bbukhar\b": "fever",
             r"\bstomac\b": "stomach",
             r"\bmedicne\b": "medicine",
             r"\bmedicals\b": "medicine",
             r"\bsugr\b": "diabetes",
-            r"\bsugar\b": "diabetes"
+            r"\bsugar\b": "diabetes",
+            r"\bkhorak\b": "dosage",
+            r"\bforms?\b": "form"
         }
         for pat, repl in typo_map.items():
             norm_query = re.sub(pat, repl, norm_query)
@@ -72,10 +80,12 @@ class FastMedicalRAG:
 
         # Detect specific query intents (interaction, dosage, alternative, allergy, treatment)
         is_interaction_query = any(w in norm_query for w in ["interaction", "together", "take with", "mix", "combine", "interact", "contraindicated"])
-        is_dosage_query = any(w in norm_query for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day", "intake", "timing", "schedule"])
+        is_dosage_query = any(w in norm_query for w in ["dose", "dosage", "how much", "mg", "frequency", "child", "adult", "day", "intake", "timing", "schedule", "form", "forms", "khorak"])
         is_alternative_query = any(w in norm_query for w in ["alternative", "substitute", "replace", "brand", "price", "pkr"])
         is_allergy_query = any(w in norm_query for w in ["allergic", "allergy", "rash", "reaction", "sensitiz", "safe"])
         is_treatment_query = any(w in norm_query for w in ["suggest", "recommend", "medicine for", "drug for", "treatment", "what to take", "what can i take", "treatment for"])
+        is_headache_fever_query = any(w in norm_query for w in ["headache", "fever", "pain", "headach", "hedick"])
+        is_bp_query = any(w in norm_query for w in ["blood pressure", "hypertension", "bp high", "high bp"])
 
         # Profile context tokens (allergies, current meds, medical conditions)
         profile_allergies = []
@@ -142,6 +152,14 @@ class FastMedicalRAG:
                 score += 15.0
                 if med_matched:
                     score += 10.0
+
+            # Boost safe OTC medicines for headache and fever
+            if is_headache_fever_query:
+                med_lower_check = (chunk.get("medicine_name", "") + " " + chunk.get("generic_name", "")).lower()
+                if any(otc in med_lower_check for otc in ["panadol", "paracetamol", "calpol"]):
+                    score += 25.0
+                elif any(otc in med_lower_check for otc in ["brufen", "disprin"]):
+                    score += 15.0
 
             # Boost if chunk directly addresses the user profile's allergies or medications
             if profile_allergies and chunk["category"] == "allergy":

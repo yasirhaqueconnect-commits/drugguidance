@@ -28,6 +28,44 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
     chunks = []
     chunk_id = 1
 
+    # Pre-scan / build Rx Lookup Dictionary from ALTERNATIVE MEDICINE
+    rx_lookup: Dict[str, str] = {
+        "panadol": "Non-Prescription (OTC)",
+        "paracetamol": "Non-Prescription (OTC)",
+        "calpol": "Non-Prescription (OTC)",
+        "brufen": "Non-Prescription (OTC)",
+        "ibuprofen": "Non-Prescription (OTC)",
+        "disprin": "Non-Prescription (OTC)",
+        "aspirin": "Non-Prescription (OTC)",
+        "risek": "Non-Prescription (OTC)",
+        "omeprazole": "Non-Prescription (OTC)",
+        "zyrtec": "Non-Prescription (OTC)",
+        "cetirizine": "Non-Prescription (OTC)",
+        "benadryl": "Non-Prescription (OTC)",
+        "piriton": "Non-Prescription (OTC)",
+        "gravinate": "Non-Prescription (OTC)"
+    }
+    alt_files_scan = _find_files("*ALTERNATIVE*.xlsx", base_dir)
+    for file_path in alt_files_scan:
+        try:
+            wb = openpyxl.load_workbook(file_path, read_only=True)
+            sheet = wb.active
+            rows = list(sheet.iter_rows(values_only=True))
+            if rows:
+                for row in rows[1:]:
+                    if not row or not any(row):
+                        continue
+                    m_name = str(row[0] or "").strip().lower()
+                    g_name = str(row[1] or "").strip().lower()
+                    rx_val = str(row[6] or "").strip().lower() if len(row) > 6 else ""
+                    st = "Non-Prescription (OTC)" if rx_val in ["no", "otc", "otc/limited"] else "Prescription Required (Rx)"
+                    if m_name:
+                        rx_lookup[m_name] = st
+                    if g_name:
+                        rx_lookup[g_name] = st
+        except Exception:
+            pass
+
     # 1. Allergy-Based Drug Filtering
     allergy_files = _find_files("*ALLERGY*.xlsx", base_dir)
     for file_path in allergy_files:
@@ -53,27 +91,37 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             if not med_name and not generic:
                 continue
 
+            rx_status = rx_lookup.get(med_name.lower(), rx_lookup.get(generic.lower(), "Prescription Required (Rx)"))
+
             text_content = (
                 f"CATEGORY: Allergy & Sensitivity Guidance\n"
                 f"Medicine Name: {med_name}\n"
                 f"Generic / Active Ingredient: {generic}\n"
+                f"Prescription Status: {rx_status}\n"
                 f"Therapeutic Category: {category}\n"
                 f"Manufacturer: {mfg}\n"
                 f"Possible Allergic / Sensitizing Agents: {allergens}\n"
                 f"Alternative Medicine (Allergen-Free): {alt_med}\n"
                 f"Remarks: {remarks}"
             )
+            kw = f"{med_name} {generic} {allergens} {alt_med} {category} {rx_status}".lower()
+            if any(p in med_name.lower() or p in generic.lower() for p in ["panadol", "paracetamol", "calpol", "brufen", "ibuprofen"]):
+                kw += " headache sar dard sir dard hedick fever bukhar pain bodyache"
+            if any(bp in med_name.lower() or bp in generic.lower() for bp in ["amlodipine", "norvasc", "lisinopril", "zestril", "captopril", "capoten", "atenolol", "tenormin", "losartan", "cozaar"]):
+                kw += " blood pressure bp hypertension high bp"
+
             chunks.append({
                 "id": f"chunk_allergy_{chunk_id}",
                 "category": "allergy",
                 "medicine_name": med_name,
                 "generic_name": generic,
-                "keywords": f"{med_name} {generic} {allergens} {alt_med} {category}".lower(),
+                "keywords": kw,
                 "content": text_content,
                 "metadata": {
                     "source": "ALLERGY-BASED DRUG FILTERING",
                     "medicine": med_name,
                     "generic": generic,
+                    "prescription_status": rx_status,
                     "allergens": allergens,
                     "alternatives": alt_med
                 }
@@ -102,27 +150,38 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             if not med_name and not generic:
                 continue
 
+            rx_status = "Non-Prescription (OTC)" if str(rx_req).strip().lower() in ["no", "otc", "otc/limited"] else "Prescription Required (Rx)"
+
             text_content = (
                 f"CATEGORY: Alternative Medicine & Brand Substitutes\n"
                 f"Medicine Name: {med_name}\n"
                 f"Generic / Active Ingredient: {generic}\n"
+                f"Prescription Status: {rx_status}\n"
                 f"Dosage Form: {form}\n"
                 f"Manufacturer: {mfg}\n"
                 f"Price in PKR (approx): {price}\n"
                 f"Alternative Brands / Substitutes: {alt_brands}\n"
                 f"Prescription Required: {rx_req}"
             )
+            kw = f"{med_name} {generic} {alt_brands} {form} {rx_status}".lower()
+            if any(p in med_name.lower() or p in generic.lower() for p in ["panadol", "paracetamol", "calpol", "brufen", "ibuprofen"]):
+                kw += " headache sar dard sir dard hedick fever bukhar pain bodyache"
+            if any(bp in med_name.lower() or bp in generic.lower() for bp in ["amlodipine", "norvasc", "lisinopril", "zestril", "captopril", "capoten", "atenolol", "tenormin", "losartan", "cozaar"]):
+                kw += " blood pressure bp hypertension high bp"
+
             chunks.append({
                 "id": f"chunk_alt_{chunk_id}",
                 "category": "alternative",
                 "medicine_name": med_name,
                 "generic_name": generic,
-                "keywords": f"{med_name} {generic} {alt_brands} {form}".lower(),
+                "keywords": kw,
                 "content": text_content,
                 "metadata": {
                     "source": "ALTERNATIVE MEDICINE",
                     "medicine": med_name,
                     "generic": generic,
+                    "prescription_status": rx_status,
+                    "dosage_form": form,
                     "price_pkr": price,
                     "alternatives": alt_brands,
                     "prescription_required": rx_req
@@ -153,28 +212,49 @@ def load_all_excel_chunks(base_dir: str = None) -> List[Dict[str, Any]]:
             if not med_name and not generic:
                 continue
 
+            rx_status = rx_lookup.get(med_name.lower(), rx_lookup.get(generic.lower(), "Prescription Required (Rx)"))
+
+            dose_info_lines = []
+            if adult_dose:
+                dose_info_lines.append(f"Recommended Adult Dosage: {adult_dose}")
+            if child_dose:
+                dose_info_lines.append(f"Recommended Pediatric Dosage: {child_dose}")
+            if max_dose:
+                dose_info_lines.append(f"Maximum Daily Dose: {max_dose}")
+            if freq:
+                dose_info_lines.append(f"Timing / Frequency: {freq}")
+            dose_info_str = "\n".join(dose_info_lines) if dose_info_lines else "Dosage: Follow standard therapeutic dosing under clinical guidance."
+
             text_content = (
-                f"CATEGORY: Dosage Guidance & Administration\n"
+                f"CATEGORY: Dosage & Formulation Reference\n"
                 f"Medicine Name: {med_name}\n"
                 f"Active Ingredient / Generic: {generic}\n"
-                f"Dosage Form: {form}\n"
-                f"Strength: {strength}\n"
-                f"Recommended Dosage (Adult): {adult_dose}\n"
-                f"Recommended Dosage (Child): {child_dose}\n"
-                f"Max Dose / Day: {max_dose}\n"
-                f"Timing / Frequency: {freq}"
+                f"Prescription Status: {rx_status}\n"
+                f"Available Dosage Form(s): {form}\n"
+                f"Available Strength(s): {strength}\n"
+                f"{dose_info_str}\n"
+                f"Commercial Formulations: Available in {form} preparations with strengths of {strength}."
             )
+            kw = f"{med_name} {generic} {form} {strength} {rx_status} dosage form strength formulation".lower()
+            if any(p in med_name.lower() or p in generic.lower() for p in ["panadol", "paracetamol", "calpol", "brufen", "ibuprofen"]):
+                kw += " headache sar dard sir dard hedick fever bukhar pain bodyache"
+            if any(bp in med_name.lower() or bp in generic.lower() for bp in ["amlodipine", "norvasc", "lisinopril", "zestril", "captopril", "capoten", "atenolol", "tenormin", "losartan", "cozaar"]):
+                kw += " blood pressure bp hypertension high bp"
+
             chunks.append({
                 "id": f"chunk_dosage_{chunk_id}",
                 "category": "dosage",
                 "medicine_name": med_name,
                 "generic_name": generic,
-                "keywords": f"{med_name} {generic} {form} {strength}".lower(),
+                "keywords": kw,
                 "content": text_content,
                 "metadata": {
                     "source": "Dosage Guidance",
                     "medicine": med_name,
                     "generic": generic,
+                    "prescription_status": rx_status,
+                    "dosage_form": form,
+                    "strength": strength,
                     "adult_dosage": adult_dose,
                     "child_dosage": child_dose,
                     "max_daily_dose": max_dose,
@@ -252,6 +332,3 @@ def get_stored_chunks() -> List[Dict[str, Any]]:
 if __name__ == "__main__":
     loaded = load_all_excel_chunks()
     print("Total chunks created:", len(loaded))
-    if loaded:
-        print("\n--- SAMPLE CHUNK ---")
-        print(loaded[0]["content"])

@@ -57,110 +57,145 @@ def generate_medical_response(
         )
 
     query_lower = query.lower()
-    asked_for_alternatives = any(w in query_lower for w in ["alternative", "substitute", "replace", "instead", "another brand", "other brand", "other medicine", "swap"])
+    is_allergy_query = any(w in query_lower for w in ["allergic", "allergy", "rash", "reaction", "hypersensitiv", "sensitiz", "safe with allergy"])
+    is_alternative_query = any(w in query_lower for w in ["alternative", "substitute", "replace", "replacement", "instead", "another brand", "other brand", "other medicine", "swap", "cheaper brand", "price", "pkr"])
+    is_dosage_query = any(w in query_lower for w in ["dose", "dosage", "how much", "how to take", "take how many", "frequency", "khorak", "how often", "timing", "schedule", "mg", "form", "forms", "intake"])
+    is_interaction_query = any(w in query_lower for w in ["interaction", "together", "take with", "mix", "combine", "interact", "along with", "with each other"])
+
+    # High Blood Pressure condition detection (User presenting with high BP / asking for BP medicine)
+    is_bp_query = any(w in query_lower for w in ["blood pressure", "hypertension", "bp high", "high bp", "blod pressure", "presure high"])
+    has_specific_med = any(m in query_lower for m in [
+        "norvasc", "amlodipine", "capoten", "captopril", "zestril", "lisinopril",
+        "tenormin", "atenolol", "cozaar", "losartan", "panadol", "augmentin",
+        "brufen", "calpol", "disprin", "risek", "flagyl", "zyrtec"
+    ])
+
+    if is_bp_query and not has_specific_med and not is_alternative_query:
+        if role_mode == "user":
+            return {
+                "answer": "Warning: Doctor consultation required. High blood pressure requires clinical evaluation and monitoring at a hospital or clinic; prescription medications cannot be self-prescribed.",
+                "model": "clinical_safety_guard",
+                "sources": sources,
+                "safety_alert": True,
+                "emergency": False,
+                "warnings": ["High blood pressure requires clinical medical evaluation."],
+                "disclaimer": "Verified clinical database evidence."
+            }
+        else:
+            return {
+                "answer": "This system does not prescribe or recommend medications for high blood pressure. Managing hypertension requires clinical evaluation and monitoring at a hospital or clinic, and prescription medications can only be safely determined and prescribed by a licensed healthcare professional. Please consult a doctor or visit a hospital for proper clinical care.",
+                "model": "clinical_safety_guard",
+                "sources": sources,
+                "safety_alert": False,
+                "emergency": False,
+                "warnings": [],
+                "disclaimer": "Verified clinical database evidence."
+            }
 
     mode_instructions = ""
     if role_mode == "pharmacist":
         mode_instructions = f"""
 - MODE: PHARMACIST WORKSPACE
   * Target audience is a licensed healthcare professional / clinical pharmacist.
-  * Answer strictly what was asked, concisely and accurately based on the verified evidence records.
-  * Keep answers crisp, direct, and to the point — do NOT provide lengthy essays, disclaimers, or unsolicited warnings.
-  {"* User specifically asked for alternatives: Provide the direct 1-line list of exact brand equivalents from the database." if asked_for_alternatives else "* User did NOT ask for alternatives: Do NOT list any alternative brands or substitutes."}
-  * For Dosages & Formulations: Provide exact dosage figures, strengths, and timing in concise bullets.
-  * For Drug Interactions: State the clinical interaction and pharmacodynamic/pharmacokinetic risk directly in 1-2 factual sentences.
-  * NEVER output disclaimers or say 'consult a doctor' or 'Doctor consultation required' or 'Note:'.
+  * Answer strictly what was asked, concisely and accurately based on the verified evidence records:
+    - If user asks about Dosage: provide Available Dosage Forms, Strengths, Adult/Pediatric dose, and Timing from Dosage Guidance records.
+    - If user asks about Alternatives: provide direct alternative brands/substitutes from Alternative Medicine records.
+    - If user asks about Drug Interactions: state compatibility, severity, and clinical mechanism from Drug-Drug Interactions records.
+    - If user asks about Allergies: state cross-sensitivity and allergen risks from Allergy-Based Filtering records.
+  * Keep answers crisp, direct, and to the point — do NOT provide lengthy essays or unsolicited boilerplate.
+  * User did NOT ask for alternatives: Do NOT list any alternative brands or substitutes.
+  * User did NOT ask for dosage: Do NOT dump dosage forms or timing tables.
+  * NEVER output 'Note:' meta-commentary.
 """
     elif role_mode == "user":
         mode_instructions = f"""
 - MODE: REGISTERED PATIENT (Personal Health Profile Active)
 {profile_summary}
-  * MANDATORY PERSONALIZED PROFILE SCANNING & CLINICAL EVALUATION:
-    You MUST rigorously cross-reference the user's inquiry and any referenced medicine against EVERY parameter of their saved patient profile in the background:
-    1. ALLERGIES: Cross-check drug composition/class against their saved allergies (e.g., penicillin/beta-lactams, sulfa, aspirin, NSAIDs). If allergic conflict exists, it is strictly contraindicated.
-    2. MEDICAL CONDITIONS: Cross-check if the medicine exacerbates or is contraindicated with their saved conditions (e.g., NSAIDs in Hypertension, Kidney disease, or Asthma; decongestants in Hypertension).
-    3. CURRENT MEDICATIONS: Cross-check drug-drug interactions between what they ask about and their ongoing medications.
-    4. PREGNANCY & AGE: If pregnancy is indicated, check trimester safety and fetal risk. If pediatric or elderly age is noted, evaluate dosage sensitivity.
+  * STRICT CONCISENESS & ACCURACY MANDATE:
+    - Keep answers crisp, highly accurate, and concise (strictly 4 to 5 bullet points total).
+    - Strictly avoid verbose essays, lengthy medical lectures, or filler paragraphs.
+    - Each bullet must be 1 short, direct line.
+    - 'Personalized Recommendation' must be exactly 1 to 2 short, punchy sentences evaluating their saved profile.
 
-  * WARNINGS FORMAT (EXACT SAME AS GUEST & PHARMACIST):
-    If the requested medicine is STRICTLY CONTRAINDICATED with the patient's saved profile (e.g. allergy conflict, pregnancy risk, or exacerbation of their medical condition) OR dangerous self-medication is proposed:
-    Output ONLY the single direct warning line (without extra preamble, so it renders in the amber warning card):
-    Warning: Doctor consultation required. [Direct clinical risk reason naming the specific profile conflict].
+  * STRICT INTENT-DRIVEN RESPONSE FORMATS (4-5 BULLETS MAX):
 
-  * UNIFIED STRUCTURED LAYOUT (WHEN PERMITTED / CLINICALLY GUIDED):
-    When the medicine is permitted or guidance is safe for their profile, format the response into clean, concise bullets with bold labels matching the exact standard layout:
-    * **Status:** Permitted (or Use With Caution).
-    * **Clinical Guidance & Dosage:** [Accurate dosage, strength, and frequency from verified database records].
-    * **Profile Safety Evaluation:** [Confirm safety against their background profile — explicitly naming their saved conditions, allergies, and ongoing medications].
-    * **Administration:** [Timing instructions, e.g. Take after meals, with water].
-    {"* **Safe Alternative:** [List 1-2 safe alternatives from database that do not conflict with their allergies or conditions]." if asked_for_alternatives else ""}
+    1. ALLERGY INQUIRY:
+       * **Medicine:** [Medicine & Generic Name]
+       * **Allergy Assessment:** [Safe / Contraindicated / High Risk]
+       * **Allergic Risk:** [1 short line on cross-reactivity or clinical reaction]
+       * **Personalized Recommendation:** [1-2 short sentences evaluating their saved allergy ({allergies})]
+       * **Safe Alternative(s):** [1 line with safe substitutes from allergy records if conflict exists]
 
-  * ABSOLUTELY FORBIDDEN:
-    - NEVER give a generic canned statement like 'No interactions found with your profile'. Always name their actual condition, allergy, or medication specifically to demonstrate real profile awareness.
+    2. ALTERNATIVE MEDICINE INQUIRY:
+       * **Medicine:** [Brand Name & Generic Name] ([OTC / Rx])
+       * **Alternative Brands:** [Direct comma-separated list of substitutes, e.g. Calpol, Febrol, Pyrol]
+       * **Manufacturer & Price:** [e.g. GSK (Approx 120–150 PKR)]
+       * **Personalized Recommendation:** [1 short sentence confirming safety with their saved profile]
+
+    3. DOSAGE & INTAKE INQUIRY:
+       * **Medicine:** [Medicine & Generic Name] ([OTC / Rx])
+       * **Available Forms & Strengths:** [e.g. Tablet / Syrup (500 mg, 120 mg/5 mL)]
+       * **Recommended Dosage:** [Adult dose, timing, and max limit: e.g. 1 tablet every 6–8 hours after meals (Max: 4 g/day)]
+       * **Personalized Recommendation:** [1-2 short sentences tailored to their profile: conditions ({conditions}), allergies ({allergies}), meds ({meds})]
+       * **Administration Guidance:** [1 short sentence: e.g. Take with a glass of water after meals.]
+
+    4. DRUG-DRUG INTERACTION INQUIRY:
+       * **Interacting Medications:** [Medicine 1 + Medicine 2]
+       * **Compatibility:** [Safe / Not Recommended / Moderate Interaction]
+       * **Clinical Effect & Risk:** [1 short line on interaction mechanism]
+       * **Personalized Recommendation:** [1-2 short sentences cross-referencing their meds: {meds}]
+       * **Clinical Recommendation:** [1 short line guideline]
+
+    5. GENERAL INQUIRY (e.g. 'What is Panadol?'):
+       * **Medicine:** [Medicine & Generic Name] ([OTC / Rx])
+       * **Primary Indication:** [1 short line on what it is used for]
+       * **Personalized Recommendation:** [1 short sentence confirming suitability for their profile]
+
+  * STRICT CONTRAINDICATION:
+    If strictly contraindicated with their saved allergy, state it directly and recommend safe alternatives concisely.
 """
     else:  # guest
         mode_instructions = f"""
 - MODE: GUEST / PUBLIC CLINICAL INQUIRY
   * Answer directly, concisely, and factually based on the verified evidence records.
-  * Answer ONLY what was specifically asked:
-    - If asked for dosage, provide dosage only.
-    - If asked for interaction, provide interaction only.
-    {"- User specifically asked for alternatives: Provide the alternative brands/substitutes from the database." if asked_for_alternatives else "- User did NOT ask for alternatives: Do NOT list any alternatives or substitutes."}
+  * Answer what was specifically asked:
+    - If user asks about Dosage: provide Available Dosage Forms, Strengths, Recommended Dosage, Timing, and Max Dose from records.
+    - If user asks about Alternatives: provide verified brand substitutes and price from records.
+    - If user asks about Interaction: provide compatibility, severity, and clinical risk from records.
+    - If user asks about Allergy: provide allergen risk and safe alternatives from records.
+    - If user did NOT ask for alternatives: Do NOT list any alternatives or substitutes.
+    - If user did NOT ask for dosage: Do NOT dump dosage tables.
+  * If the user asks about high blood pressure / hypertension, state that this system does not prescribe medications for high blood pressure and direct them to a hospital or doctor for prescription care.
+  * If the user asks about mild headache, inform them that non-prescription (OTC) pain relievers such as Panadol (Paracetamol) are available over the counter, while severe or persistent headache requires doctor consultation.
   * NEVER output 'Note:', boilerplate disclaimers, or preachy filler.
-  * If the user asks dangerous medical advice or proposes hazardous self-medication:
-    Warning: Doctor consultation required. [Direct 1-line clinical risk reason].
 """
 
     system_prompt = f"""You are DrugGuide AI — an intelligent, evidence-based clinical medical decision support assistant.
 
-CORE PRINCIPLES:
-1. STRICT ENGLISH-ONLY POLICY (MANDATORY & UNCOMPROMISING):
-   - You MUST formulate every response strictly in clear, professional ENGLISH only.
-   - Absolutely NO Urdu, Roman Urdu, Hindi, Arabic, or any other language or dialect in your output.
-   - Even if the user asks their question in Roman Urdu, Urdu, Hindi, or any other language, understand their query accurately but respond 100% in grammatically correct, clinical ENGLISH.
-   - Under no circumstances should you ever use words from Roman Urdu or any language other than English.
-2. Zero emojis, icons, or logos (no ⚠️, 🚨, etc.).
-3. Direct & Concise: Answer what the user specifically asked without preachy filler, unsolicited boilerplate, or 'Note:' commentary.
-4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining what the evidence records contain or do not contain across any portal (NEVER say 'Note: The evidence provided lists...').
-5. NO UNSOLICITED ALTERNATIVES: ONLY provide alternative medicines, brands, or substitutes IF the user specifically asked for them. If the user did NOT ask for alternatives, do NOT list alternatives or substitutes.
-6. STRICTLY NON-PRESCRIPTION / NO MEDICINE SUGGESTIONS FOR CONDITIONS:
-   - This system is an evidence-based drug information lookup reference only, NOT a prescribing doctor.
-   - The system NEVER suggests, recommends, or prescribes medicines for illnesses, medical conditions, or general symptoms (e.g. if asked 'suggest medicine for high blood pressure', 'what medicine can I take for fever/cough?', 'what medicine is good for acidity?').
-   - In response to condition-based recommendation requests, state clearly in 1 direct sentence: "This system provides evidence-based information on specific medications and does not suggest or prescribe treatments for medical conditions. Please specify a medicine name to check its dosage, interactions, or alternative brands, or consult a qualified doctor for medical prescriptions."
-   - When a user asks about a SPECIFIC DRUG by name: Provide verified pharmacological reference data (dosages, timing, interactions, or requested alternative brands) for THAT specific drug only.
-7. DOSAGE & INTAKE GUIDANCE:
-   - When the user asks about dosage, administration, or how to take a specific medicine:
-     * Provide the exact verified adult and/or child dosage, timing, and maximum daily limit from the verified evidence records.
-     * In GUEST & PHARMACIST modes, format into clean structured bullets:
-       * **Medicine & Strength:** [Drug name, form, and strength from records, e.g. Panadol 500 mg Tablet]
-       * **Adult Dosage:** [Exact verified adult dose and frequency, e.g. 1 tablet (500 mg) every 6-8 hours]
-       * **Child Dosage:** [Exact pediatric dose from records, e.g. 5 mL syrup (120 mg/5 mL) 2-3 times/day, or Not recommended for children without doctor guidance]
-       * **Maximum Daily Dose:** [Exact max limit per day, e.g. 4 g/day for adults]
-       * **Administration:** [e.g. Take after meals with water]
-   - In REGISTERED PATIENT (User Profile) mode:
-     * If the medicine is safe for their profile, use the UNIFIED STRUCTURED LAYOUT:
-       * **Status:** Permitted (or Use With Caution).
-       * **Clinical Guidance & Dosage:** [Adult dose, child dose, and maximum daily limit].
-       * **Profile Safety Evaluation:** [Confirm safety against their background profile — explicitly naming their saved conditions, allergies, and ongoing medications].
-       * **Administration:** [Timing instructions, e.g. Take after meals, with water].
-     * If the medicine conflicts with their saved profile (e.g. Penicillin allergy with Augmentin):
-       Output ONLY the single direct warning line:
-       Warning: Doctor consultation required. [Direct clinical risk reason naming the specific profile conflict].
-   - If the user asks for dosage information generally without naming any medicine (e.g. 'dosage information'):
-     State directly in 1 friendly sentence: "Please specify the name of the medicine (e.g. Panadol, Brufen, Augmentin, Risek) you would like to check dosage information for."
-8. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence. Do not list categories or bullet points.
-9. UNIFIED STRUCTURED FORMATTING (EXCEPT FOR WARNINGS):
-   - Except for doctor warnings, ALWAYS format clinical answers (dosage, intake confirmation, interactions) into clean, concise bullet points with bold descriptive labels.
-   - For intake / dosage confirmation (e.g. 'Can I take two capsules of omeprazole 20mg per day'):
-     * **Status:** Yes, permitted (or Not recommended).
-     * **Dosage Guidance:** [Explain specific dose, e.g. Maximum daily dose for Omeprazole (Risek) is 40 mg/day, corresponding to two 20 mg capsules].
-     * **Administration:** [e.g. Take 30-60 minutes before meals].
-   - For drug interaction questions:
-     * **Compatibility:** Not recommended / Safe.
-     * **Interaction Severity:** Severe / Moderate (e.g. both are NSAIDs).
-     * **Clinical Risk:** [Specific risk, e.g. Increased stomach ulcers and bleeding].
-   - SAFETY WARNINGS EXCEPTION: When doctor consultation is required or dangerous self-medication is proposed, output ONLY the single direct warning line without any bullets or extra paragraphs before or after:
-     Warning: Doctor consultation required. [Direct 1-line clinical risk reason].
+CORE PRINCIPLES & DATASET ARCHITECTURE:
+Our system is grounded in 4 verified clinical databases:
+1. ALLERGY-BASED DRUG FILTERING (Allergies, hypersensitivity, contraindicated drug classes, safe alternatives).
+2. ALTERNATIVE MEDICINE (Alternative brand substitutes, generic equivalents, manufacturer, PKR price).
+3. DOSAGE GUIDANCE (Dosage forms, strengths, adult dosage, pediatric dosage, timing, max daily dose).
+4. DRUG-DRUG INTERACTIONS (Drug combinations, compatibility, severity level, clinical risk, recommendations).
+
+STRICT INTENT RULES:
+1. STRICT ENGLISH-ONLY POLICY: Formulate every response strictly in clear, professional ENGLISH only. No Roman Urdu, Urdu, or Hindi in the output.
+2. ZERO EMOJIS, ICONS, OR LOGOS (no ⚠️, 🚨, etc.).
+3. ANSWER ONLY WHAT WAS ASKED:
+   - If user asks about allergy -> answer from Allergy records.
+   - If user asks about alternative -> answer from Alternative Medicine records. NEVER provide alternatives if user did not ask for them.
+   - If user asks about dosage -> answer from Dosage Guidance records. NEVER dump dosage tables if user did not ask for dosage.
+   - If user asks about drug interaction -> answer from Drug-Drug Interactions records.
+   - If user asks a general question -> give a concise overview without unsolicited dosage or alternative lists.
+4. ABSOLUTE BAN ON 'Note:' META-COMMENTARY: NEVER start, end, or include 'Note:', 'Disclaimer:', or commentary explaining evidence records.
+5. NO UNSOLICITED ALTERNATIVES: ONLY provide alternative medicines/brands IF the user specifically asked for them.
+6. NO UNSOLICITED DOSAGE: ONLY provide detailed dosage schedules IF the user specifically asked for dosage, intake, or administration.
+7. MEDICAL CONDITIONS (PRESCRIPTION VS. NON-PRESCRIPTION / OTC):
+   - Never prescribe or recommend prescription medications for chronic conditions like High Blood Pressure / Hypertension. Direct to hospital/doctor for clinical evaluation.
+   - Mild self-limiting symptoms (mild headache, mild fever) may reference over-the-counter OTC options (Panadol/Paracetamol).
+8. Greetings & Casual Chat (e.g. 'hello', 'hi'): Respond in 1 friendly sentence.
+9. UNIFIED STRUCTURED FORMATTING: Format clinical answers into clean, concise bullet points with bold descriptive labels matching the requested intent.
 
 {mode_instructions}
 """
@@ -197,7 +232,7 @@ Understand the user's intent and formulate a helpful, professional answer STRICT
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                max_tokens=650,
+                max_tokens=350,
                 temperature=0.2
             )
             answer = completion.choices[0].message.content.strip()
@@ -214,12 +249,57 @@ Understand the user's intent and formulate a helpful, professional answer STRICT
             med = top_c.get("medicine_name", "Specified Medication")
             meta = top_c.get("metadata", {})
             if cat == "dosage":
+                rx_st = meta.get("prescription_status", "Non-Prescription (OTC)" if any(p in med.lower() for p in ["panadol", "paracetamol", "calpol"]) else "Prescription Required (Rx)")
+                d_form = meta.get("dosage_form", "Tablet / Syrup / Capsule")
+                str_val = meta.get("strength", "Standard commercial strengths")
+                adult_dose = meta.get("adult_dosage", "Follow standard therapeutic dosing")
+                child_dose = meta.get("child_dosage", "Follow pediatric guidance")
+                freq = meta.get("frequency", "As directed")
+                max_dose = meta.get("max_daily_dose", "Standard daily limit")
                 answer = (
-                    f"* **Medicine:** {med}\n"
-                    f"* **Adult Dosage:** {meta.get('adult_dosage', 'Standard therapeutic dose')}\n"
-                    f"* **Child Dosage:** {meta.get('child_dosage', 'Consult pediatrician for age/weight-based dose')}\n"
-                    f"* **Maximum Daily Dose:** {meta.get('max_daily_dose', 'Do not exceed maximum daily limit')}\n"
-                    f"* **Administration:** {meta.get('timing_frequency', 'Take with water as directed')}"
+                    f"* **Medicine:** {med} ({meta.get('generic', '')})\n"
+                    f"* **Prescription Status:** {rx_st}\n"
+                    f"* **Available Dosage Form(s):** {d_form}\n"
+                    f"* **Available Strength(s):** {str_val}\n"
+                    f"* **Recommended Adult Dosage:** {adult_dose}\n"
+                    f"* **Recommended Pediatric Dosage:** {child_dose}\n"
+                    f"* **Maximum Daily Dose:** {max_dose}\n"
+                    f"* **Timing & Frequency:** {freq}\n"
+                    f"* **Administration Guidance:** Take {freq.lower() if freq else 'as directed with water'}."
+                )
+            elif cat == "alternative":
+                sub = meta.get("substitutes", "Calpol, Febrol, Pyrol")
+                mfg = meta.get("manufacturer", "Standard manufacturer")
+                prc = meta.get("price_pkr", "Standard price")
+                rx = meta.get("prescription_status", "Non-Prescription (OTC)")
+                answer = (
+                    f"* **Medicine:** {med} ({meta.get('generic', '')})\n"
+                    f"* **Prescription Status:** {rx}\n"
+                    f"* **Alternative Brands / Substitutes:** {sub}\n"
+                    f"* **Manufacturer & Price:** {mfg} (Approx PKR {prc})"
+                )
+            elif cat == "allergy":
+                ans_status = meta.get("status", "Check for hypersensitivity")
+                risk = meta.get("risk", "Cross-sensitivity risk")
+                safe_alt = meta.get("safe_alternatives", "Consult alternative therapeutic options")
+                answer = (
+                    f"* **Medicine:** {med} ({meta.get('generic', '')})\n"
+                    f"* **Allergy Assessment:** {ans_status}\n"
+                    f"* **Allergic Risk:** {risk}\n"
+                    f"* **Safe Alternative(s):** {safe_alt}"
+                )
+            elif cat == "interaction":
+                m1 = meta.get("medicine_1", med)
+                m2 = meta.get("medicine_2", "Concurrent drug")
+                sev = meta.get("severity", "Moderate")
+                eff = meta.get("clinical_effect", "Potential interaction effect")
+                rec = meta.get("recommendation", "Monitor or consult healthcare professional")
+                answer = (
+                    f"* **Interacting Medications:** {m1} + {m2}\n"
+                    f"* **Compatibility:** Use With Caution\n"
+                    f"* **Interaction Severity:** {sev}\n"
+                    f"* **Clinical Effect & Risk:** {eff}\n"
+                    f"* **Clinical Recommendation:** {rec}"
                 )
             else:
                 answer = top_c.get("content", f"Evidence Record: {med}")
@@ -232,7 +312,7 @@ Understand the user's intent and formulate a helpful, professional answer STRICT
     answer = re.sub(r'(?:\n+|^)\s*(?:\*\*)?Note:?\s*(?:\*\*)?[^\n]*', '', answer, flags=re.IGNORECASE).strip()
 
     # If the user did not ask for alternatives, strip any unsolicited alternatives section
-    if not asked_for_alternatives:
+    if not is_alternative_query:
         answer = re.sub(r'(?:\n+|^)\s*[-*•]?\s*(?:\*\*)?(?:Safe\s+)?Alternatives?:?(?:\*\*)?.*?(?=\n\s*[-*•]?\s*(?:\*\*)?[A-Z]|\Z)', '', answer, flags=re.DOTALL | re.IGNORECASE).strip()
 
     # Detect safety alerts

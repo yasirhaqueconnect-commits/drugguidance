@@ -4,7 +4,7 @@ echo Starting Drug Guidance AI (Backend + Frontend)
 echo ===================================================
 
 echo Starting FastAPI Backend on port 8001...
-start "DrugGuide Backend" cmd /k "cd /d %~dp0 && py -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload"
+start "DrugGuide Backend" cmd /k "cd /d %~dp0 && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload"
 
 timeout /t 3 /nobreak >nul
 
