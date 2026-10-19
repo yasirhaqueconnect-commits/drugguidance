@@ -218,7 +218,7 @@ def send_welcome_email(to_email: str, recipient_name: str, role: str = "user") -
     accent_dark = "#6d28d9" if is_pharma else "#0f766e"
     role_badge = "Licensed Pharmacist" if is_pharma else "Verified Patient"
 
-    subject = f"🎉 Welcome to MedQurex - Congratulations, {recipient_name or 'Member'}!"
+    subject = f"Welcome to MedQurex - Congratulations, {recipient_name or 'Member'}!"
 
     text_body = f"""Congratulations and Welcome to MedQurex!
 
@@ -238,8 +238,8 @@ You can access your portal anytime at: https://www.medqurex.tech
 
 If you have any questions or require clinical support, feel free to reply directly to this email.
 
-Warm congratulations,
-MedQurex Clinical Team
+Warm regards,
+MedQurex Clinical Intelligence Team
 https://www.medqurex.tech
 """
 
@@ -251,23 +251,23 @@ https://www.medqurex.tech
   <title>{subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 36px 16px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 28px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+        <table role="presentation" width="100%" style="max-width: 540px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
           
           <!-- Banner -->
           <tr>
-            <td style="background: linear-gradient(135deg, {accent_color}, {accent_dark}); padding: 40px 28px; text-align: center;">
-              <div style="display: inline-block; background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 999px; margin-bottom: 12px;">
-                <span style="color: #ffffff; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
-                  ✨ Account Activated
+            <td style="background: linear-gradient(135deg, {accent_color}, {accent_dark}); padding: 36px 24px; text-align: center;">
+              <div style="display: inline-block; background: rgba(255, 255, 255, 0.2); padding: 6px 16px; border-radius: 999px; margin-bottom: 10px;">
+                <span style="color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">
+                  Account Activated
                 </span>
               </div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">
-                Welcome to MedQurex!
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">
+                Welcome to MedQurex
               </h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
+              <p style="margin: 6px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 13px; font-weight: 500;">
                 {portal_name}
               </p>
             </td>
@@ -275,28 +275,30 @@ https://www.medqurex.tech
 
           <!-- Main Body -->
           <tr>
-            <td style="padding: 36px 32px;">
-              <h2 style="margin: 0 0 14px; font-size: 20px; font-weight: 700; color: #0f172a;">
-                Congratulations, {recipient_name or 'Valued Member'}! 🎊
+            <td style="padding: 32px 24px;">
+              <h2 style="margin: 0 0 12px; font-size: 19px; font-weight: 700; color: #0f172a;">
+                Congratulations, {recipient_name or 'Valued Member'}!
               </h2>
-              <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.7; color: #475569;">
+              <p style="margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: #475569;">
                 Your account has been officially registered and verified on the <strong>MedQurex Clinical Intelligence Platform</strong>. We are thrilled to empower your healthcare journey with evidence-based pharmacological intelligence.
               </p>
 
-              <!-- Account Summary Box -->
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+              <!-- Account Summary Box: Mobile-Optimized Full-Width Stacked Layout -->
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin: 22px 0;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 6px;">
+                  Registered Account Email
+                </div>
+                <div style="font-size: 15px; font-weight: 700; color: #0f172a; word-break: break-all; font-family: monospace; padding: 10px 14px; background-color: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 14px;">
+                  {to_email}
+                </div>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">Registered Email:</td>
-                    <td align="right" style="font-size: 13px; font-weight: 600; color: #0f172a; font-family: monospace;">{to_email}</td>
-                  </tr>
                   <tr>
                     <td style="font-size: 13px; color: #64748b; padding: 4px 0;">Access Tier:</td>
                     <td align="right" style="font-size: 13px; font-weight: 700; color: {accent_color};">{role_badge}</td>
                   </tr>
                   <tr>
-                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">System Status:</td>
-                    <td align="right" style="font-size: 13px; font-weight: 600; color: #10b981;">Active & Ready</td>
+                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">Account Status:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 700; color: #059669;">Active &amp; Ready</td>
                   </tr>
                 </table>
               </div>
