@@ -164,11 +164,64 @@ MedQurex Clinical Intelligence
     return _send_mime_message(to_email, subject, text_body, html_body)
 
 
+def _send_via_resend_http(to_email: str, subject: str, text_content: str, html_content: str) -> bool:
+    """
+    Dispatches email over HTTPS (Port 443) using Resend REST API.
+    Bypasses cloud platform SMTP blocks (e.g. Render Free Tier) completely.
+    """
+    import json
+    import urllib.request
+
+    api_key = (settings.RESEND_API_KEY or "").strip()
+    if not api_key:
+        return False
+
+    sender = (settings.RESEND_FROM or "").strip() or "MedQurex Security <onboarding@resend.dev>"
+
+    payload = {
+        "from": sender,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content,
+        "text": text_content
+    }
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "MedQurex-Clinical/2.2"
+        }
+    )
+
+    try:
+        logger.info(f"Dispatching email to {to_email} via Resend HTTPS API (Port 443)...")
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            logger.info(f"Resend HTTPS dispatch succeeded: {resp_data}")
+            print(f"[RESEND_SUCCESS] Dispatched email to {to_email} via HTTPS API (id={resp_data.get('id')})")
+            return True
+    except Exception as exc:
+        logger.warning(f"Resend HTTPS dispatch failed: {exc}", exc_info=True)
+        print(f"[RESEND_WARNING] Resend dispatch failed: {exc}. Falling back to Titan SMTP...")
+        return False
+
+
 def _send_mime_message(to_email: str, subject: str, text_content: str, html_content: str) -> bool:
     """
-    Sends an email via Titan SMTP with STARTTLS, automatic retries, and robust error handling.
+    Sends an email via Resend HTTPS API (if configured) or Titan SMTP with STARTTLS.
     """
     import time
+
+    # 1. Primary Cloud Delivery: If RESEND_API_KEY is present, send over HTTPS Port 443 (never blocked on Render)
+    if (settings.RESEND_API_KEY or "").strip():
+        sent_via_http = _send_via_resend_http(to_email, subject, text_content, html_content)
+        if sent_via_http:
+            return True
+
+    # 2. Secondary / Local Delivery: Titan SMTP on Port 587
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"MedQurex Support <{settings.SMTP_FROM}>"
@@ -195,7 +248,7 @@ def _send_mime_message(to_email: str, subject: str, text_content: str, html_cont
             server.send_message(msg)
             server.quit()
             logger.info(f"Successfully dispatched email to {to_email}")
-            print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} (Attempt {attempt})")
+            print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} via SMTP (Attempt {attempt})")
             return True
         except Exception as exc:
             last_error = exc
@@ -206,6 +259,7 @@ def _send_mime_message(to_email: str, subject: str, text_content: str, html_cont
 
     print(f"[EMAIL_ERROR] Failed to send email to {to_email} after {max_retries} attempts: {last_error}")
     return False
+
 
 
 

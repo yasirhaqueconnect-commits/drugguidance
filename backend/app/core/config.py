@@ -44,6 +44,11 @@ class Settings:
     SMTP_PASS: str = os.getenv("SMTP_PASS", "")
     SMTP_FROM: str = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "system@medqurex.tech"))
 
+    # Cloud HTTP Email API (Resend HTTPS Port 443 - for Render Free Tier)
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM: str = os.getenv("RESEND_FROM", "")
+
+
 
     @property
     def normalized_database_url(self) -> str:
