@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
@@ -56,6 +56,16 @@ export default function UserForgotPasswordPage() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Automatically dismiss success alerts after 4.5 seconds to preserve vertical space
+  useEffect(() => {
+    if (successMsg) {
+      const timer = setTimeout(() => {
+        setSuccessMsg(null);
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg]);
 
   // ----------------------------------------------------
   // RESET PASSWORD FLOW
@@ -310,47 +320,50 @@ export default function UserForgotPasswordPage() {
             </div>
           </div>
 
-          {/* Recovery Method Tabs */}
-          <div className={`grid grid-cols-2 p-1 rounded-xl mb-6 ${isLight ? "bg-slate-100" : "bg-slate-900"}`}>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("reset_password");
-                setError(null);
-                setSuccessMsg(null);
-              }}
-              className={`py-2 text-xs font-bold rounded-lg transition ${
-                activeTab === "reset_password"
-                  ? isLight
-                    ? "bg-white text-teal-600 shadow-sm"
-                    : "bg-teal-600 text-white shadow-sm"
-                  : isLight
-                  ? "text-slate-600 hover:text-slate-900"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Reset Password
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("forgot_email");
-                setError(null);
-                setSuccessMsg(null);
-              }}
-              className={`py-2 text-xs font-bold rounded-lg transition ${
-                activeTab === "forgot_email"
-                  ? isLight
-                    ? "bg-white text-teal-600 shadow-sm"
-                    : "bg-teal-600 text-white shadow-sm"
-                  : isLight
-                  ? "text-slate-600 hover:text-slate-900"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              Forgot Email?
-            </button>
-          </div>
+          {/* Recovery Method Tabs - ONLY visible on initial Step 1 */}
+          {((activeTab === "reset_password" && resetStep === 1) ||
+            (activeTab === "forgot_email" && emailStep === 1)) && (
+            <div className={`grid grid-cols-2 p-1 rounded-xl mb-6 ${isLight ? "bg-slate-100" : "bg-slate-900"}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("reset_password");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 text-xs font-bold rounded-lg transition ${
+                  activeTab === "reset_password"
+                    ? isLight
+                      ? "bg-white text-teal-600 shadow-sm"
+                      : "bg-teal-600 text-white shadow-sm"
+                    : isLight
+                    ? "text-slate-600 hover:text-slate-900"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Reset Password
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("forgot_email");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 text-xs font-bold rounded-lg transition ${
+                  activeTab === "forgot_email"
+                    ? isLight
+                      ? "bg-white text-teal-600 shadow-sm"
+                      : "bg-teal-600 text-white shadow-sm"
+                    : isLight
+                    ? "text-slate-600 hover:text-slate-900"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                Forgot Email?
+              </button>
+            </div>
+          )}
 
           {/* Error Alert */}
           {error && (
