@@ -110,7 +110,13 @@ export default function UserForgotPasswordPage() {
       setSuccessMsg(res.message || "Code confirmed! Now set your new password.");
       setResetStep(3);
     } catch (err: any) {
-      setError(err.message || "Invalid or expired verification code. Please check and try again.");
+      // If Render backend is still deploying new endpoints (returns 404 Not Found),
+      // gracefully proceed to Step 3 because Step 3 verifies OTP with /verify-and-reset on the server
+      if (err.message && (err.message.includes("Not Found") || err.message === "Not Found")) {
+        setResetStep(3);
+      } else {
+        setError(err.message || "Invalid or expired verification code. Please check and try again.");
+      }
     } finally {
       setLoading(false);
     }
