@@ -27,12 +27,15 @@ function PharmacistLoginContent() {
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
       setRegisteredMsg("Pharmacist registration successful! Please enter your password to sign in.");
+    } else if (searchParams.get("reset") === "true") {
+      setRegisteredMsg("Password successfully reset! Please sign in with your new credentials.");
     }
     const emailParam = searchParams.get("email");
     if (emailParam) {
       setEmail(emailParam);
     }
   }, [searchParams]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,10 +120,19 @@ function PharmacistLoginContent() {
           </div>
 
           <div>
-            <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className={`block text-xs font-semibold ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                Password
+              </label>
+              <Link
+                href="/pharmacist/forgot-password"
+                className="text-[11px] font-semibold text-purple-600 hover:text-purple-700 hover:underline transition"
+              >
+                Forgot Password?
+              </Link>
+            </div>
             <div className="relative">
+
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type={showPassword ? "text" : "password"}

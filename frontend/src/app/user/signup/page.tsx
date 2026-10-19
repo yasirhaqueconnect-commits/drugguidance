@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
 import { api } from "@/lib/api";
-import { UserCheck, Mail, Lock, User, ArrowRight, AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { UserCheck, Mail, Lock, User, Phone, ArrowRight, AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 export default function UserSignupPage() {
   const router = useRouter();
@@ -14,8 +14,10 @@ export default function UserSignupPage() {
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,7 @@ export default function UserSignupPage() {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = fullName.trim();
+    const cleanPhone = phone.trim();
 
     if (password !== confirmPassword) {
       setError("Passwords do not match. Please verify your password.");
@@ -48,7 +51,12 @@ export default function UserSignupPage() {
     setLoading(true);
 
     try {
-      const res = await api.userSignup({ full_name: cleanName, email: cleanEmail, password });
+      const res = await api.userSignup({
+        full_name: cleanName,
+        email: cleanEmail,
+        password,
+        phone: cleanPhone || undefined,
+      });
       if (res) {
         setSuccessMsg("Account registered successfully! Redirecting to login...");
         setTimeout(() => {
@@ -61,6 +69,7 @@ export default function UserSignupPage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors ${isLight ? "bg-slate-50 text-slate-900" : "bg-gray-950 text-slate-100"
@@ -146,6 +155,26 @@ export default function UserSignupPage() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                Contact Number <span className="text-[10px] font-normal text-slate-400">(for account & email recovery)</span>
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="tel"
+                  placeholder="+92 300 1234567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs outline-none border transition ${isLight
+                      ? "bg-slate-50 border-slate-300 text-slate-900 focus:border-teal-500"
+                      : "bg-slate-950/70 border-slate-800 text-slate-100 focus:border-teal-500"
+                    }`}
+                />
+              </div>
+            </div>
+
 
             <div>
               <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>

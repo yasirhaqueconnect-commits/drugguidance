@@ -12,12 +12,17 @@ import {
   UserSignupPayload,
   PharmacistSignupPayload,
   LoginPayload,
+  ForgotPasswordOtpPayload,
+  ResetPasswordVerifyPayload,
+  ForgotEmailPayload,
+  ForgotEmailResponse,
   ChatResponsePayload,
   ConversationSummary,
   ConversationHistoryDetail,
   ClinicalNote,
   ConversationAuditDossier
 } from "@/types";
+
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -138,7 +143,27 @@ export const api = {
   pharmacistLogin: (data: LoginPayload): Promise<AuthResponse> =>
     request<AuthResponse>("/auth/pharmacist/login", { method: "POST", body: JSON.stringify(data) }),
 
+  // Account Recovery (Forgot Password & Forgot Email)
+  sendPasswordResetOtp: (data: ForgotPasswordOtpPayload): Promise<{ status: string; message: string }> =>
+    request<{ status: string; message: string }>("/auth/forgot-password/send-otp", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  verifyAndResetPassword: (data: ResetPasswordVerifyPayload): Promise<{ status: string; message: string }> =>
+    request<{ status: string; message: string }>("/auth/forgot-password/verify-and-reset", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  forgotEmailFind: (data: ForgotEmailPayload): Promise<ForgotEmailResponse> =>
+    request<ForgotEmailResponse>("/auth/forgot-email/find", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   getMe: (): Promise<User> =>
+
     request<User>("/auth/me", { method: "GET" }),
 
   // Profiles

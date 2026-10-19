@@ -81,6 +81,7 @@ export interface UserSignupPayload {
   email: string;
   password: string;
   full_name: string;
+  phone?: string;
 }
 
 export interface PharmacistSignupPayload {
@@ -95,6 +96,32 @@ export interface LoginPayload {
   email: string;
   password: string;
 }
+
+export interface ForgotPasswordOtpPayload {
+  email: string;
+  role: "user" | "pharmacist";
+}
+
+export interface ResetPasswordVerifyPayload {
+  email: string;
+  role: "user" | "pharmacist";
+  otp_code: string;
+  new_password: string;
+}
+
+export interface ForgotEmailPayload {
+  phone: string;
+  role: "user" | "pharmacist";
+}
+
+export interface ForgotEmailResponse {
+  status: string;
+  email: string;
+  full_name: string;
+  role: string;
+  message: string;
+}
+
 
 export interface ChatMessage {
   id?: number;
