@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`fixed lg:static inset-y-0 left-0 w-64 lg:w-72 flex flex-col h-[100dvh] max-h-[100dvh] p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] shrink-0 transition-all duration-300 border-r z-40 shadow-2xl lg:shadow-none overflow-hidden select-none ${isLight ? "bg-white border-slate-200/80 text-slate-800" : "bg-gray-950 border-slate-800 text-slate-100"
+        className={`fixed lg:static top-0 bottom-0 left-0 z-50 w-64 lg:w-72 h-full lg:h-[100dvh] flex flex-col pt-4 px-4 pb-0 shrink-0 transition-all duration-300 border-r shadow-2xl lg:shadow-none overflow-hidden select-none ${isLight ? "bg-white border-slate-200/80 text-slate-800" : "bg-gray-950 border-slate-800 text-slate-100"
           }`}
       >
         {/* Brand Header — Restored PharmRAG AI Logo & Identity */}
@@ -538,7 +538,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom User Medical Profile Button */}
         {user && onOpenProfile && (
-          <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
+          <div className={`mt-auto pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <button
               onClick={onOpenProfile}
               className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer shadow-sm ${isLight
@@ -558,7 +558,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Guest Action Button: Home */}
         {isGuest && (
-          <div className={`mt-auto pt-2.5 pb-2 mb-2 border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
+          <div className={`mt-auto pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t shrink-0 ${isLight ? "border-slate-100" : "border-slate-800/80"}`}>
             <Link
               href="/"
               className={`w-full py-2.5 px-3.5 rounded-xl border transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm ${isLight
