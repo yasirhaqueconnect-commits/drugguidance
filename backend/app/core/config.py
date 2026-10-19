@@ -46,8 +46,7 @@ class Settings:
 
     # Cloud HTTP Email API (Resend HTTPS Port 443 - for Render Free Tier)
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
-    RESEND_FROM: str = os.getenv("RESEND_FROM", "MedQurex Support <system@medqurex.tech>")
-
+    RESEND_FROM: str = os.getenv("RESEND_FROM", "")
 
 
 

@@ -168,7 +168,6 @@ def _send_via_resend_http(to_email: str, subject: str, text_content: str, html_c
     """
     Dispatches email over HTTPS (Port 443) using Resend REST API.
     Bypasses cloud platform SMTP blocks (e.g. Render Free Tier) completely.
-    Uses environment variable RESEND_API_KEY (never hardcoded).
     """
     import json
     import urllib.request
@@ -177,47 +176,52 @@ def _send_via_resend_http(to_email: str, subject: str, text_content: str, html_c
     if not api_key:
         return False
 
-    sender = (settings.RESEND_FROM or "").strip() or "MedQurex Support <system@medqurex.tech>"
+    # Primary sender from settings or system@medqurex.tech
+    primary_sender = (settings.RESEND_FROM or "").strip()
+    if not primary_sender:
+        primary_sender = f"MedQurex Support <{settings.SMTP_FROM or 'system@medqurex.tech'}>"
 
-    for current_sender in [sender, "MedQurex Security <onboarding@resend.dev>"]:
+    def _execute_resend_request(from_address: str) -> bool:
         payload = {
-            "from": current_sender,
+            "from": from_address,
             "to": [to_email],
             "subject": subject,
             "html": html_content,
             "text": text_content
         }
-
         req = urllib.request.Request(
             "https://api.resend.com/emails",
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                "User-Agent": "MedQurex-Clinical/2.2"
             }
         )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            logger.info(f"Resend HTTPS dispatch succeeded: {resp_data}")
+            print(f"[RESEND_SUCCESS] Dispatched email to {to_email} via Resend (from={from_address}, id={resp_data.get('id')})")
+            return True
 
-        try:
-            logger.info(f"Dispatching email to {to_email} via Resend HTTPS API (Port 443) from {current_sender}...")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                logger.info(f"Resend HTTPS dispatch succeeded: {resp_data}")
-                print(f"[RESEND_SUCCESS] Dispatched email to {to_email} via HTTPS API from {current_sender} (id={resp_data.get('id')})")
-                return True
-        except urllib.error.HTTPError as http_err:
-            err_body = http_err.read().decode("utf-8", errors="ignore")
-            logger.warning(f"Resend HTTP {http_err.code} from {current_sender}: {err_body}")
-            print(f"[RESEND_WARN] Attempt from {current_sender} failed ({http_err.code}): {err_body}")
-            if "domain" in err_body.lower() and current_sender != "MedQurex Security <onboarding@resend.dev>":
-                continue
-            break
-        except Exception as exc:
-            logger.warning(f"Resend dispatch failed: {exc}", exc_info=True)
-            print(f"[RESEND_WARNING] Resend dispatch failed: {exc}. Falling back to Titan SMTP...")
-            break
-
-    return False
+    try:
+        logger.info(f"Attempting dispatch to {to_email} via Resend from {primary_sender}...")
+        return _execute_resend_request(primary_sender)
+    except urllib.error.HTTPError as http_err:
+        # If medqurex.tech domain is not yet verified in Resend dashboard, fallback to onboarding@resend.dev
+        if http_err.code == 403 and "onboarding@resend.dev" not in primary_sender:
+            logger.warning(f"Domain not yet verified in Resend (HTTP 403). Falling back to onboarding@resend.dev...")
+            print(f"[RESEND_FALLBACK] Domain not yet verified in Resend. Falling back to onboarding@resend.dev so OTP is delivered...")
+            try:
+                return _execute_resend_request("MedQurex Support <onboarding@resend.dev>")
+            except Exception as fallback_exc:
+                logger.error(f"Fallback Resend dispatch failed: {fallback_exc}")
+        logger.warning(f"Resend HTTPS dispatch failed: {http_err}")
+        return False
+    except Exception as exc:
+        logger.warning(f"Resend HTTPS dispatch failed: {exc}", exc_info=True)
+        print(f"[RESEND_WARNING] Resend dispatch failed: {exc}. Falling back to Titan SMTP...")
+        return False
 
 
 
