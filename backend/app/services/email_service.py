@@ -177,42 +177,35 @@ def _send_mime_message(to_email: str, subject: str, text_content: str, html_cont
     msg.attach(MIMEText(text_content, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
+    port = settings.SMTP_PORT or 587
+    user = (settings.SMTP_USER or "").strip()
+    password = (settings.SMTP_PASS or "").strip()
+
     max_retries = 3
     last_error = None
 
     for attempt in range(1, max_retries + 1):
-        # On cloud hosts like Render, Port 465 (Direct SSL) connects in ~1s and is never throttled
-        use_ssl = (attempt % 2 == 1) or (settings.SMTP_PORT == 465)
-        port = 465 if use_ssl else (settings.SMTP_PORT or 587)
-
         try:
-            if use_ssl:
-                logger.info(f"[Attempt {attempt}/{max_retries}] Connecting via SMTP_SSL to {settings.SMTP_HOST}:{port}...")
-                server = smtplib.SMTP_SSL(settings.SMTP_HOST, port, timeout=12)
-            else:
-                logger.info(f"[Attempt {attempt}/{max_retries}] Connecting via SMTP+STARTTLS to {settings.SMTP_HOST}:{port}...")
-                server = smtplib.SMTP(settings.SMTP_HOST, port, timeout=12)
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-
-            user = (settings.SMTP_USER or "").strip()
-            password = (settings.SMTP_PASS or "").strip()
+            logger.info(f"[Attempt {attempt}/{max_retries}] Connecting to SMTP {settings.SMTP_HOST}:{port}...")
+            server = smtplib.SMTP(settings.SMTP_HOST, port, timeout=25)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
             server.login(user, password)
             server.send_message(msg)
             server.quit()
-
             logger.info(f"Successfully dispatched email to {to_email}")
-            print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} via port {port} (Attempt {attempt})")
+            print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} (Attempt {attempt})")
             return True
         except Exception as exc:
             last_error = exc
-            logger.warning(f"[Attempt {attempt}] Email dispatch error to {to_email} via port {port}: {exc}")
-            print(f"[EMAIL_RETRY] Attempt {attempt} failed on port {port}: {exc}")
+            logger.warning(f"[Attempt {attempt}] Email dispatch warning to {to_email}: {exc}")
+            print(f"[EMAIL_RETRY] Attempt {attempt} failed: {exc}")
             if attempt < max_retries:
-                time.sleep(1.0)
+                time.sleep(1.5)
 
     print(f"[EMAIL_ERROR] Failed to send email to {to_email} after {max_retries} attempts: {last_error}")
     return False
+
 
 
