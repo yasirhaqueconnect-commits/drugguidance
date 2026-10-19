@@ -166,8 +166,9 @@ MedQurex Clinical Intelligence
 
 def _send_mime_message(to_email: str, subject: str, text_content: str, html_content: str) -> bool:
     """
-    Sends an email via Titan SMTP with STARTTLS and robust error handling.
+    Sends an email via Titan SMTP with STARTTLS, automatic retries, and robust error handling.
     """
+    import time
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"MedQurex Support <{settings.SMTP_FROM}>"
@@ -176,18 +177,28 @@ def _send_mime_message(to_email: str, subject: str, text_content: str, html_cont
     msg.attach(MIMEText(text_content, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-    try:
-        logger.info(f"Connecting to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20)
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(settings.SMTP_USER, settings.SMTP_PASS)
-        server.send_message(msg)
-        server.quit()
-        logger.info(f"Successfully dispatched email to {to_email}")
-        return True
-    except Exception as exc:
-        logger.error(f"Failed to deliver email to {to_email}: {exc}", exc_info=True)
-        print(f"[EMAIL_ERROR] Failed to send email to {to_email}: {exc}")
-        return False
+    max_retries = 3
+    last_error = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[Attempt {attempt}/{max_retries}] Connecting to SMTP {settings.SMTP_HOST}:{settings.SMTP_PORT}...")
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(settings.SMTP_USER, settings.SMTP_PASS)
+            server.send_message(msg)
+            server.quit()
+            logger.info(f"Successfully dispatched email to {to_email}")
+            print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} (Attempt {attempt})")
+            return True
+        except Exception as exc:
+            last_error = exc
+            logger.warning(f"[Attempt {attempt}] Email dispatch warning to {to_email}: {exc}")
+            if attempt < max_retries:
+                time.sleep(1.5)
+
+    print(f"[EMAIL_ERROR] Failed to send email to {to_email} after {max_retries} attempts: {last_error}")
+    return False
+
