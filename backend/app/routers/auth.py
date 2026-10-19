@@ -8,8 +8,9 @@ import re
 import secrets
 from datetime import datetime, timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
+
 
 from app.core import (
     get_db,
@@ -200,9 +201,14 @@ def get_auth_me(current_user: Any = Depends(get_current_user_required)):
 # ----------------- 4. ACCOUNT RECOVERY (FORGOT PASSWORD & FORGOT EMAIL) -----------------
 
 @router.post("/forgot-password/send-otp", summary="Send Password Reset OTP")
-def forgot_password_send_otp(req: ForgotPasswordOtpReq, db: Session = Depends(get_db)):
+def forgot_password_send_otp(
+    req: ForgotPasswordOtpReq,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
-    Generates a secure 6-digit OTP and emails it to the user's or pharmacist's registered address.
+    Generates a secure 6-digit OTP and emails it asynchronously to the user's or pharmacist's registered address.
+    Returns HTTP 200 immediately (<100ms) without blocking on SMTP socket communication.
     """
     clean_email = req.email.strip().lower()
     target_role = "pharmacist" if req.role.strip().lower() == "pharmacist" else "user"
@@ -215,7 +221,7 @@ def forgot_password_send_otp(req: ForgotPasswordOtpReq, db: Session = Depends(ge
     if not account:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No {target_role} account found registered with email '{clean_email}'."
+            detail=f"No {target_role} account found registered with email '{clean_email}'. Please check your email or register a new account."
         )
 
     # Invalidate previous unexpired OTPs for this email and role
@@ -239,25 +245,21 @@ def forgot_password_send_otp(req: ForgotPasswordOtpReq, db: Session = Depends(ge
     db.add(otp_record)
     db.commit()
 
-    # Dispatch email via Titan SMTP
+    # Dispatch email asynchronously in background so response returns instantaneously
     full_name = getattr(account, "full_name", "") or ("Pharmacist" if target_role == "pharmacist" else "User")
-    dispatched = send_password_reset_otp_email(
+    background_tasks.add_task(
+        send_password_reset_otp_email,
         to_email=clean_email,
         recipient_name=full_name,
         otp_code=otp_code,
         role=target_role
     )
 
-    if not dispatched:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification code email. Please verify SMTP network settings."
-        )
-
     return {
         "status": "success",
         "message": f"A 6-digit verification code has been dispatched to {clean_email}."
     }
+
 
 
 @router.post("/forgot-password/verify-and-reset", summary="Verify OTP and Set New Password")
@@ -315,10 +317,14 @@ def forgot_password_verify_and_reset(req: ResetPasswordVerifyReq, db: Session = 
 
 
 @router.post("/forgot-email/find", summary="Find Account Email by Phone Number")
-def forgot_email_find(req: ForgotEmailReq, db: Session = Depends(get_db)):
+def forgot_email_find(
+    req: ForgotEmailReq,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Finds and displays the user's registered email address using their phone number.
-    Also dispatches a recovery notice to that email.
+    Also dispatches a recovery notice to that email asynchronously.
     """
     input_digits = re.sub(r"\D", "", req.phone)
     if len(input_digits) < 7:
@@ -356,16 +362,15 @@ def forgot_email_find(req: ForgotEmailReq, db: Session = Depends(get_db)):
             detail=f"No registered {target_role} account found matching phone number '{req.phone}'."
         )
 
-    # Dispatch email notice to the account address (silently best-effort)
-    try:
-        send_email_recovery_notification(
-            to_email=matched_account.email,
-            recipient_name=getattr(matched_account, "full_name", ""),
-            phone=req.phone,
-            role=target_role
-        )
-    except Exception as e:
-        print(f"[RECOVERY_NOTICE_WARN] Could not send notice email: {e}")
+    # Dispatch email notice to the account address asynchronously in background
+    background_tasks.add_task(
+        send_email_recovery_notification,
+        to_email=matched_account.email,
+        recipient_name=getattr(matched_account, "full_name", ""),
+        phone=req.phone,
+        role=target_role
+    )
+
 
     return {
         "status": "success",
