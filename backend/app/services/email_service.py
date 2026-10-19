@@ -196,9 +196,12 @@ def _send_mime_message(to_email: str, subject: str, text_content: str, html_cont
                 server.starttls()
                 server.ehlo()
 
-            server.login(settings.SMTP_USER, settings.SMTP_PASS)
+            user = (settings.SMTP_USER or "").strip()
+            password = (settings.SMTP_PASS or "").strip()
+            server.login(user, password)
             server.send_message(msg)
             server.quit()
+
             logger.info(f"Successfully dispatched email to {to_email}")
             print(f"[EMAIL_SUCCESS] Dispatched email to {to_email} via port {port} (Attempt {attempt})")
             return True
