@@ -168,6 +168,7 @@ def _send_via_resend_http(to_email: str, subject: str, text_content: str, html_c
     """
     Dispatches email over HTTPS (Port 443) using Resend REST API.
     Bypasses cloud platform SMTP blocks (e.g. Render Free Tier) completely.
+    Uses environment variable RESEND_API_KEY (never hardcoded).
     """
     import json
     import urllib.request
@@ -176,37 +177,48 @@ def _send_via_resend_http(to_email: str, subject: str, text_content: str, html_c
     if not api_key:
         return False
 
-    sender = (settings.RESEND_FROM or "").strip() or "MedQurex Security <onboarding@resend.dev>"
+    sender = (settings.RESEND_FROM or "").strip() or "MedQurex Support <system@medqurex.tech>"
 
-    payload = {
-        "from": sender,
-        "to": [to_email],
-        "subject": subject,
-        "html": html_content,
-        "text": text_content
-    }
-
-    req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "MedQurex-Clinical/2.2"
+    for current_sender in [sender, "MedQurex Security <onboarding@resend.dev>"]:
+        payload = {
+            "from": current_sender,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content
         }
-    )
 
-    try:
-        logger.info(f"Dispatching email to {to_email} via Resend HTTPS API (Port 443)...")
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-            logger.info(f"Resend HTTPS dispatch succeeded: {resp_data}")
-            print(f"[RESEND_SUCCESS] Dispatched email to {to_email} via HTTPS API (id={resp_data.get('id')})")
-            return True
-    except Exception as exc:
-        logger.warning(f"Resend HTTPS dispatch failed: {exc}", exc_info=True)
-        print(f"[RESEND_WARNING] Resend dispatch failed: {exc}. Falling back to Titan SMTP...")
-        return False
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+        )
+
+        try:
+            logger.info(f"Dispatching email to {to_email} via Resend HTTPS API (Port 443) from {current_sender}...")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                logger.info(f"Resend HTTPS dispatch succeeded: {resp_data}")
+                print(f"[RESEND_SUCCESS] Dispatched email to {to_email} via HTTPS API from {current_sender} (id={resp_data.get('id')})")
+                return True
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode("utf-8", errors="ignore")
+            logger.warning(f"Resend HTTP {http_err.code} from {current_sender}: {err_body}")
+            print(f"[RESEND_WARN] Attempt from {current_sender} failed ({http_err.code}): {err_body}")
+            if "domain" in err_body.lower() and current_sender != "MedQurex Security <onboarding@resend.dev>":
+                continue
+            break
+        except Exception as exc:
+            logger.warning(f"Resend dispatch failed: {exc}", exc_info=True)
+            print(f"[RESEND_WARNING] Resend dispatch failed: {exc}. Falling back to Titan SMTP...")
+            break
+
+    return False
+
 
 
 def _send_mime_message(to_email: str, subject: str, text_content: str, html_content: str) -> bool:
