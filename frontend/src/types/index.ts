@@ -102,6 +102,12 @@ export interface ForgotPasswordOtpPayload {
   role: "user" | "pharmacist";
 }
 
+export interface VerifyOtpPayload {
+  email: string;
+  role: "user" | "pharmacist";
+  otp_code: string;
+}
+
 export interface ResetPasswordVerifyPayload {
   email: string;
   role: "user" | "pharmacist";
@@ -112,6 +118,19 @@ export interface ResetPasswordVerifyPayload {
 export interface ForgotEmailPayload {
   phone: string;
   role: "user" | "pharmacist";
+}
+
+export interface ForgotEmailSendOtpResponse {
+  status: string;
+  message: string;
+  masked_email: string;
+  phone: string;
+}
+
+export interface ForgotEmailVerifyOtpPayload {
+  phone: string;
+  role: "user" | "pharmacist";
+  otp_code: string;
 }
 
 export interface ForgotEmailResponse {

@@ -20,6 +20,7 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Send,
 } from "lucide-react";
 
 export default function PharmacistForgotPasswordPage() {
@@ -30,10 +31,10 @@ export default function PharmacistForgotPasswordPage() {
   // Mode: "reset_password" | "forgot_email"
   const [activeTab, setActiveTab] = useState<"reset_password" | "forgot_email">("reset_password");
 
-  // Step for reset password: 1 = enter email, 2 = enter OTP and new password
-  const [resetStep, setResetStep] = useState<1 | 2>(1);
+  // Reset Password Flow: 1 = Email, 2 = Verify OTP alone, 3 = New Password
+  const [resetStep, setResetStep] = useState<1 | 2 | 3>(1);
 
-  // Reset Password form state
+  // Reset Password Form State
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -41,20 +42,27 @@ export default function PharmacistForgotPasswordPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Forgot Email form state
+  // Forgot Email Flow: 1 = Phone input, 2 = Verify OTP sent to email, 3 = Result
+  const [emailStep, setEmailStep] = useState<1 | 2 | 3>(1);
   const [phone, setPhone] = useState("");
+  const [emailOtpCode, setEmailOtpCode] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
   const [foundEmail, setFoundEmail] = useState<string | null>(null);
   const [foundName, setFoundName] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // UI state
+  // Global UI State
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Send OTP
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  // ----------------------------------------------------
+  // RESET PASSWORD FLOW
+  // ----------------------------------------------------
+
+  // Step 1: Send OTP to Pharmacist Email
+  const handleSendResetOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
     setSuccessMsg(null);
@@ -71,7 +79,7 @@ export default function PharmacistForgotPasswordPage() {
         email: cleanEmail,
         role: "pharmacist",
       });
-      setSuccessMsg(res.message || "A 6-digit verification code has been dispatched to your email.");
+      setSuccessMsg(res.message || "A 6-digit clinical verification code has been dispatched to your email.");
       setResetStep(2);
     } catch (err: any) {
       setError(err.message || "Failed to dispatch verification code. Please try again.");
@@ -80,25 +88,8 @@ export default function PharmacistForgotPasswordPage() {
     }
   };
 
-  // Resend OTP
-  const handleResendOtp = async () => {
-    setError(null);
-    setResending(true);
-    try {
-      const res = await api.sendPasswordResetOtp({
-        email: email.trim().toLowerCase(),
-        role: "pharmacist",
-      });
-      setSuccessMsg("A new verification code has been dispatched to your email.");
-    } catch (err: any) {
-      setError(err.message || "Failed to resend code.");
-    } finally {
-      setResending(false);
-    }
-  };
-
-  // Verify OTP and Reset Password
-  const handleVerifyAndReset = async (e: React.FormEvent) => {
+  // Step 2: Verify OTP
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
@@ -109,13 +100,35 @@ export default function PharmacistForgotPasswordPage() {
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match. Please verify your new password.");
+    setLoading(true);
+    try {
+      const res = await api.verifyPasswordResetOtp({
+        email: email.trim().toLowerCase(),
+        role: "pharmacist",
+        otp_code: cleanOtp,
+      });
+      setSuccessMsg(res.message || "Code confirmed! Now set your new clinical password.");
+      setResetStep(3);
+    } catch (err: any) {
+      setError(err.message || "Invalid or expired verification code. Please check and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 3: Set New Password
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters long.");
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match. Please verify your new password.");
       return;
     }
 
@@ -124,7 +137,7 @@ export default function PharmacistForgotPasswordPage() {
       const res = await api.verifyAndResetPassword({
         email: email.trim().toLowerCase(),
         role: "pharmacist",
-        otp_code: cleanOtp,
+        otp_code: otpCode.trim(),
         new_password: newPassword,
       });
 
@@ -133,19 +146,38 @@ export default function PharmacistForgotPasswordPage() {
         router.push(`/pharmacist/login?reset=true&email=${encodeURIComponent(email.trim().toLowerCase())}`);
       }, 1200);
     } catch (err: any) {
-      setError(err.message || "Verification failed. Please check the OTP and try again.");
+      setError(err.message || "Failed to reset password. The code may have expired. Please restart.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Find Email using Phone Number
-  const handleFindEmail = async (e: React.FormEvent) => {
+  // Resend OTP for Reset Password
+  const handleResendResetOtp = async () => {
+    setError(null);
+    setResending(true);
+    try {
+      const res = await api.sendPasswordResetOtp({
+        email: email.trim().toLowerCase(),
+        role: "pharmacist",
+      });
+      setSuccessMsg("A new verification code has been dispatched to your email.");
+    } catch (err: any) {
+      setError(err.message || "Failed to resend verification code.");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // FORGOT EMAIL FLOW
+  // ----------------------------------------------------
+
+  // Step 1: Enter Phone Number -> Send OTP to linked email
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
-    setFoundEmail(null);
-    setFoundName(null);
 
     const cleanPhone = phone.trim();
     if (!cleanPhone || cleanPhone.length < 7) {
@@ -155,17 +187,64 @@ export default function PharmacistForgotPasswordPage() {
 
     setLoading(true);
     try {
-      const res = await api.forgotEmailFind({
+      const res = await api.forgotEmailSendOtp({
         phone: cleanPhone,
         role: "pharmacist",
       });
-      setFoundEmail(res.email);
-      setFoundName(res.full_name);
-      setSuccessMsg("Pharmacist account located! Your registered email address is shown below.");
+      setMaskedEmail(res.masked_email);
+      setSuccessMsg(res.message || "A 6-digit verification code has been sent to your registered email.");
+      setEmailStep(2);
     } catch (err: any) {
       setError(err.message || "No registered pharmacist account found matching this phone number.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Step 2: Verify OTP -> Reveal email & send confirmation email
+  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    const cleanOtp = emailOtpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 6) {
+      setError("Please enter the complete 6-digit verification code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.forgotEmailVerifyOtp({
+        phone: phone.trim(),
+        role: "pharmacist",
+        otp_code: cleanOtp,
+      });
+      setFoundEmail(res.email);
+      setFoundName(res.full_name);
+      setSuccessMsg("We have sent your account email to your inbox and confirmed your identity!");
+      setEmailStep(3);
+    } catch (err: any) {
+      setError(err.message || "Invalid or expired verification code. Please check and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend OTP for Forgot Email
+  const handleResendEmailOtp = async () => {
+    setError(null);
+    setResending(true);
+    try {
+      const res = await api.forgotEmailSendOtp({
+        phone: phone.trim(),
+        role: "pharmacist",
+      });
+      setSuccessMsg("A fresh verification code has been sent to your email.");
+    } catch (err: any) {
+      setError(err.message || "Failed to resend code.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -232,6 +311,7 @@ export default function PharmacistForgotPasswordPage() {
               onClick={() => {
                 setActiveTab("reset_password");
                 setError(null);
+                setSuccessMsg(null);
               }}
               className={`py-2 text-xs font-bold rounded-lg transition ${
                 activeTab === "reset_password"
@@ -250,6 +330,7 @@ export default function PharmacistForgotPasswordPage() {
               onClick={() => {
                 setActiveTab("forgot_email");
                 setError(null);
+                setSuccessMsg(null);
               }}
               className={`py-2 text-xs font-bold rounded-lg transition ${
                 activeTab === "forgot_email"
@@ -281,14 +362,14 @@ export default function PharmacistForgotPasswordPage() {
             </div>
           )}
 
-          {/* ================= TAB 1: RESET PASSWORD ================= */}
+          {/* ================= TAB 1: RESET PASSWORD (3 STEPS) ================= */}
           {activeTab === "reset_password" && (
             <>
-              {resetStep === 1 ? (
-                // Step 1: Request OTP
-                <form onSubmit={handleSendOtp} className="space-y-4">
+              {/* STEP 1: Enter Email */}
+              {resetStep === 1 && (
+                <form onSubmit={handleSendResetOtp} className="space-y-4">
                   <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
-                    Enter your registered clinical pharmacist email. We will send you a 6-digit verification code.
+                    Enter your registered pharmacist email. We will send a 6-digit clinical security code to your inbox.
                   </p>
 
                   <div>
@@ -300,7 +381,7 @@ export default function PharmacistForgotPasswordPage() {
                       <input
                         type="email"
                         required
-                        placeholder="pharmacist@gmail.com"
+                        placeholder="practitioner@medqurex.tech"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs outline-none border transition ${
@@ -318,12 +399,14 @@ export default function PharmacistForgotPasswordPage() {
                     className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
                   >
                     {loading ? "Sending Verification Code..." : "Send Verification Code"}
-                    <ArrowRight className="w-4 h-4" />
+                    <Send className="w-4 h-4" />
                   </button>
                 </form>
-              ) : (
-                // Step 2: Verify OTP and Set New Password
-                <form onSubmit={handleVerifyAndReset} className="space-y-4">
+              )}
+
+              {/* STEP 2: Verify OTP Only */}
+              {resetStep === 2 && (
+                <form onSubmit={handleVerifyResetOtp} className="space-y-4">
                   <div
                     className={`p-3 rounded-xl text-xs flex items-center justify-between border ${
                       isLight ? "bg-purple-50/70 border-purple-200 text-purple-800" : "bg-purple-950/30 border-purple-800/60 text-purple-300"
@@ -341,7 +424,6 @@ export default function PharmacistForgotPasswordPage() {
                     </button>
                   </div>
 
-                  {/* 6-Digit OTP */}
                   <div>
                     <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
                       6-Digit Clinical Security Code (OTP)
@@ -362,6 +444,41 @@ export default function PharmacistForgotPasswordPage() {
                         }`}
                       />
                     </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                  >
+                    {loading ? "Verifying Code..." : "Verify Code"}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      disabled={resending}
+                      onClick={handleResendResetOtp}
+                      className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:underline disabled:opacity-50 font-semibold"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${resending ? "animate-spin" : ""}`} />
+                      <span>{resending ? "Resending code..." : "Didn't receive code? Resend"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: Enter New Password */}
+              {resetStep === 3 && (
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div
+                    className={`p-3 rounded-xl text-xs border flex items-center gap-2 ${
+                      isLight ? "bg-purple-50/70 border-purple-200 text-purple-800" : "bg-purple-950/30 border-purple-800/60 text-purple-300"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-purple-500" />
+                    <span>Practitioner identity verified! Enter your new password below.</span>
                   </div>
 
                   {/* New Password */}
@@ -427,7 +544,109 @@ export default function PharmacistForgotPasswordPage() {
                     disabled={loading}
                     className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
                   >
-                    {loading ? "Resetting Password..." : "Update & Reset Password"}
+                    {loading ? "Updating Password..." : "Update Password"}
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* ================= TAB 2: FORGOT EMAIL (3 STEPS) ================= */}
+          {activeTab === "forgot_email" && (
+            <div className="space-y-4">
+              {/* STEP 1: Enter Phone Number */}
+              {emailStep === 1 && (
+                <form onSubmit={handleSendEmailOtp} className="space-y-4">
+                  <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
+                    Cannot recall your clinical account email? Enter your registered phone number. We will send a verification code to the email associated with your practitioner profile.
+                  </p>
+
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                      Registered Pharmacist Phone Number
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+92 300 1234567"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs outline-none border transition ${
+                          isLight
+                            ? "bg-slate-50 border-slate-300 text-slate-900 focus:border-purple-500"
+                            : "bg-slate-950/70 border-slate-800 text-slate-100 focus:border-purple-500"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                  >
+                    {loading ? "Verifying Phone..." : "Verify Number & Send Code"}
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+
+              {/* STEP 2: Enter OTP sent to registered email */}
+              {emailStep === 2 && (
+                <form onSubmit={handleVerifyEmailOtp} className="space-y-4">
+                  <div
+                    className={`p-3 rounded-xl text-xs border ${
+                      isLight ? "bg-purple-50/70 border-purple-200 text-purple-800" : "bg-purple-950/30 border-purple-800/60 text-purple-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Phone: <strong className="font-semibold">{phone}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setEmailStep(1)}
+                        className="text-[11px] underline font-bold ml-2 shrink-0 hover:opacity-80"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    {maskedEmail && (
+                      <p className="mt-1 text-[11px] text-purple-700 dark:text-purple-400">
+                        Code sent to: <strong>{maskedEmail}</strong>
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
+                      6-Digit Clinical Security Code (OTP)
+                    </label>
+                    <div className="relative">
+                      <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        placeholder="123456"
+                        value={emailOtpCode}
+                        onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, ""))}
+                        className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs font-mono tracking-widest text-center text-base outline-none border transition ${
+                          isLight
+                            ? "bg-slate-50 border-slate-300 text-slate-900 focus:border-purple-500"
+                            : "bg-slate-950/70 border-slate-800 text-slate-100 focus:border-purple-500"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                  >
+                    {loading ? "Verifying Code..." : "Verify & Reveal Email"}
                     <CheckCircle2 className="w-4 h-4" />
                   </button>
 
@@ -435,7 +654,7 @@ export default function PharmacistForgotPasswordPage() {
                     <button
                       type="button"
                       disabled={resending}
-                      onClick={handleResendOtp}
+                      onClick={handleResendEmailOtp}
                       className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:underline disabled:opacity-50 font-semibold"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${resending ? "animate-spin" : ""}`} />
@@ -444,55 +663,19 @@ export default function PharmacistForgotPasswordPage() {
                   </div>
                 </form>
               )}
-            </>
-          )}
 
-          {/* ================= TAB 2: FORGOT EMAIL ================= */}
-          {activeTab === "forgot_email" && (
-            <div className="space-y-4">
-              <p className={`text-xs ${isLight ? "text-slate-600" : "text-slate-300"}`}>
-                Cannot recall your clinical account email? Enter the contact phone number registered with your pharmacist profile.
-              </p>
-
-              <form onSubmit={handleFindEmail} className="space-y-4">
-                <div>
-                  <label className={`block text-xs font-semibold mb-1 ${isLight ? "text-slate-700" : "text-slate-300"}`}>
-                    Registered Pharmacist Phone Number
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="+92 300 1234567"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-xs outline-none border transition ${
-                        isLight
-                          ? "bg-slate-50 border-slate-300 text-slate-900 focus:border-purple-500"
-                          : "bg-slate-950/70 border-slate-800 text-slate-100 focus:border-purple-500"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                >
-                  {loading ? "Searching Practitioner Records..." : "Find My Pharmacist Email"}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-
-              {/* Found Email Display Box */}
-              {foundEmail && (
+              {/* STEP 3: Email Revealed & Notice Sent */}
+              {emailStep === 3 && foundEmail && (
                 <div
-                  className={`mt-4 p-4 rounded-xl border ${
+                  className={`p-4 rounded-xl border ${
                     isLight ? "bg-purple-50/80 border-purple-200 text-slate-900" : "bg-purple-950/30 border-purple-800 text-slate-100"
                   }`}
                 >
+                  <div className="p-3 mb-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>We sent your account email to your inbox!</span>
+                  </div>
+
                   <div className="text-[11px] font-bold text-purple-600 uppercase tracking-wider mb-1">
                     Pharmacist Account Located
                   </div>

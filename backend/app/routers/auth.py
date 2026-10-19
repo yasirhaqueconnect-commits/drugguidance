@@ -25,12 +25,17 @@ from app.schemas.auth import (
     PharmacistSignupReq,
     LoginReq,
     ForgotPasswordOtpReq,
+    VerifyOtpReq,
     ResetPasswordVerifyReq,
     ForgotEmailReq,
+    ForgotEmailSendOtpReq,
+    ForgotEmailVerifyOtpReq,
 )
 from app.services.email_service import (
     send_password_reset_otp_email,
-    send_email_recovery_notification
+    send_email_recovery_notification,
+    send_welcome_email,
+    send_forgot_email_otp,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -39,7 +44,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # ----------------- 1. PATIENT / USER AUTH -----------------
 
 @router.post("/user/signup", summary="Patient Registration")
-def user_signup(req: UserSignupReq, db: Session = Depends(get_db)):
+def user_signup(req: UserSignupReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Registers a new patient account with encrypted credentials."""
     clean_email = req.email.strip().lower()
     existing = db.query(User).filter(User.email == clean_email).first()
@@ -60,6 +65,14 @@ def user_signup(req: UserSignupReq, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Send congratulations / welcome email in background
+    background_tasks.add_task(
+        send_welcome_email,
+        to_email=new_user.email,
+        recipient_name=new_user.full_name or "Valued Member",
+        role="user"
+    )
 
     token = create_access_token({"sub": str(new_user.id), "role": "user"})
     return {
@@ -103,7 +116,7 @@ def user_login(req: LoginReq, db: Session = Depends(get_db)):
 # ----------------- 2. PHARMACIST AUTH -----------------
 
 @router.post("/pharmacist/signup", summary="Pharmacist Registration")
-def pharmacist_signup(req: PharmacistSignupReq, db: Session = Depends(get_db)):
+def pharmacist_signup(req: PharmacistSignupReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Registers a licensed clinical pharmacist account."""
     try:
         clean_email = req.email.strip().lower()
@@ -125,6 +138,14 @@ def pharmacist_signup(req: PharmacistSignupReq, db: Session = Depends(get_db)):
         db.add(new_pharma)
         db.commit()
         db.refresh(new_pharma)
+
+        # Send congratulations / welcome email in background
+        background_tasks.add_task(
+            send_welcome_email,
+            to_email=new_pharma.email,
+            recipient_name=new_pharma.full_name or "Clinical Pharmacist",
+            role="pharmacist"
+        )
 
         token = create_access_token({"sub": str(new_pharma.id), "role": "pharmacist"})
         return {
@@ -262,10 +283,40 @@ def forgot_password_send_otp(
 
 
 
+@router.post("/forgot-password/verify-otp", summary="Verify Reset Password OTP")
+def forgot_password_verify_otp(req: VerifyOtpReq, db: Session = Depends(get_db)):
+    """
+    Validates that the provided 6-digit OTP is active, correct, and unexpired.
+    Does not consume the OTP yet so it can be committed with the new password.
+    """
+    clean_email = req.email.strip().lower()
+    target_role = "pharmacist" if req.role.strip().lower() == "pharmacist" else "user"
+    clean_otp = req.otp_code.strip()
+
+    otp_record = db.query(PasswordResetOTP).filter(
+        PasswordResetOTP.email == clean_email,
+        PasswordResetOTP.role == target_role,
+        PasswordResetOTP.otp_code == clean_otp,
+        PasswordResetOTP.is_used == False,
+        PasswordResetOTP.expires_at > datetime.utcnow()
+    ).order_by(PasswordResetOTP.id.desc()).first()
+
+    if not otp_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code. Please check your code or request a new one."
+        )
+
+    return {
+        "status": "success",
+        "message": "Verification code confirmed successfully."
+    }
+
+
 @router.post("/forgot-password/verify-and-reset", summary="Verify OTP and Set New Password")
 def forgot_password_verify_and_reset(req: ResetPasswordVerifyReq, db: Session = Depends(get_db)):
     """
-    Verifies the one-time code and resets the account password.
+    Verifies the one-time code, consumes it, and resets the account password.
     """
     clean_email = req.email.strip().lower()
     target_role = "pharmacist" if req.role.strip().lower() == "pharmacist" else "user"
@@ -316,53 +367,134 @@ def forgot_password_verify_and_reset(req: ResetPasswordVerifyReq, db: Session = 
     }
 
 
-@router.post("/forgot-email/find", summary="Find Account Email by Phone Number")
-def forgot_email_find(
-    req: ForgotEmailReq,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
-):
-    """
-    Finds and displays the user's registered email address using their phone number.
-    Also dispatches a recovery notice to that email asynchronously.
-    """
-    input_digits = re.sub(r"\D", "", req.phone)
+def _find_account_by_phone(phone: str, role: str, db: Session):
+    input_digits = re.sub(r"\D", "", phone)
     if len(input_digits) < 7:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please provide a valid contact number (at least 7 digits)."
         )
 
-    target_role = "pharmacist" if req.role.strip().lower() == "pharmacist" else "user"
+    target_role = "pharmacist" if role.strip().lower() == "pharmacist" else "user"
 
     if target_role == "pharmacist":
         accounts = db.query(Pharmacist).filter(Pharmacist.phone != "", Pharmacist.phone.isnot(None)).all()
     else:
         accounts = db.query(User).filter(User.phone != "", User.phone.isnot(None)).all()
 
-    matched_account = None
     for acc in accounts:
         acc_digits = re.sub(r"\D", "", acc.phone or "")
         if not acc_digits:
             continue
-        # Compare if digits match or last 7-10 digits match (handling country code prefixes like +92 vs 03)
         if acc_digits == input_digits:
-            matched_account = acc
-            break
+            return acc, target_role
         elif len(input_digits) >= 7 and len(acc_digits) >= 7:
-            # Check last 7 digits or last 9 digits suffix match
             min_len = min(len(input_digits), len(acc_digits), 9)
             if input_digits[-min_len:] == acc_digits[-min_len:]:
-                matched_account = acc
-                break
+                return acc, target_role
 
+    return None, target_role
+
+
+@router.post("/forgot-email/send-otp", summary="Verify Phone & Send Recovery OTP to Email")
+def forgot_email_send_otp(
+    req: ForgotEmailSendOtpReq,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Locates the account by phone number, generates a 6-digit OTP,
+    and dispatches it to the registered email address.
+    """
+    matched_account, target_role = _find_account_by_phone(req.phone, req.role, db)
     if not matched_account:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No registered {target_role} account found matching phone number '{req.phone}'."
         )
 
-    # Dispatch email notice to the account address asynchronously in background
+    # Invalidate previous unused OTPs for this email and role
+    db.query(PasswordResetOTP).filter(
+        PasswordResetOTP.email == matched_account.email,
+        PasswordResetOTP.role == target_role,
+        PasswordResetOTP.is_used == False
+    ).update({"is_used": True})
+
+    otp_code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
+
+    otp_record = PasswordResetOTP(
+        email=matched_account.email,
+        role=target_role,
+        otp_code=otp_code,
+        is_used=False,
+        expires_at=expires_at
+    )
+    db.add(otp_record)
+    db.commit()
+
+    full_name = getattr(matched_account, "full_name", "") or ("Pharmacist" if target_role == "pharmacist" else "User")
+    background_tasks.add_task(
+        send_forgot_email_otp,
+        to_email=matched_account.email,
+        recipient_name=full_name,
+        otp_code=otp_code,
+        role=target_role
+    )
+
+    # Create masked preview e.g. ya***@gmail.com
+    email_parts = matched_account.email.split("@")
+    user_part = email_parts[0]
+    domain_part = email_parts[1] if len(email_parts) > 1 else ""
+    if len(user_part) <= 2:
+        masked = f"{user_part}***@{domain_part}"
+    else:
+        masked = f"{user_part[:2]}***{user_part[-1]}@{domain_part}"
+
+    return {
+        "status": "success",
+        "message": f"A 6-digit verification code has been dispatched to your registered email ({masked}).",
+        "masked_email": masked,
+        "phone": req.phone
+    }
+
+
+@router.post("/forgot-email/verify-otp", summary="Verify OTP and Reveal Account Email")
+def forgot_email_verify_otp(
+    req: ForgotEmailVerifyOtpReq,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Verifies the 6-digit OTP sent to the user's email, marks it as verified,
+    sends an email delivery notification, and returns the full email address.
+    """
+    matched_account, target_role = _find_account_by_phone(req.phone, req.role, db)
+    if not matched_account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No registered {target_role} account found matching phone number '{req.phone}'."
+        )
+
+    clean_otp = req.otp_code.strip()
+    otp_record = db.query(PasswordResetOTP).filter(
+        PasswordResetOTP.email == matched_account.email,
+        PasswordResetOTP.role == target_role,
+        PasswordResetOTP.otp_code == clean_otp,
+        PasswordResetOTP.is_used == False,
+        PasswordResetOTP.expires_at > datetime.utcnow()
+    ).order_by(PasswordResetOTP.id.desc()).first()
+
+    if not otp_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code. Please check the code or request a new one."
+        )
+
+    otp_record.is_used = True
+    db.commit()
+
+    # Automatically deliver recovery notice to user's inbox
     background_tasks.add_task(
         send_email_recovery_notification,
         to_email=matched_account.email,
@@ -371,6 +503,36 @@ def forgot_email_find(
         role=target_role
     )
 
+    return {
+        "status": "success",
+        "email": matched_account.email,
+        "full_name": matched_account.full_name or "",
+        "role": target_role,
+        "message": f"We have sent your account email to your inbox: {matched_account.email}"
+    }
+
+
+@router.post("/forgot-email/find", summary="Find Account Email by Phone Number (Legacy)")
+def forgot_email_find(
+    req: ForgotEmailReq,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Legacy direct lookup endpoint for backward compatibility."""
+    matched_account, target_role = _find_account_by_phone(req.phone, req.role, db)
+    if not matched_account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No registered {target_role} account found matching phone number '{req.phone}'."
+        )
+
+    background_tasks.add_task(
+        send_email_recovery_notification,
+        to_email=matched_account.email,
+        recipient_name=getattr(matched_account, "full_name", ""),
+        phone=req.phone,
+        role=target_role
+    )
 
     return {
         "status": "success",

@@ -35,6 +35,13 @@ class ForgotPasswordOtpReq(BaseModel):
     role: str = "user"  # "user" or "pharmacist"
 
 
+class VerifyOtpReq(BaseModel):
+    """Request to verify OTP code before allowing password change."""
+    email: EmailStr
+    role: str = "user"
+    otp_code: str
+
+
 class ResetPasswordVerifyReq(BaseModel):
     """Request to verify OTP and set a new password."""
     email: EmailStr
@@ -47,6 +54,19 @@ class ForgotEmailReq(BaseModel):
     """Request to retrieve registered email using phone number."""
     phone: str
     role: str = "user"  # "user" or "pharmacist"
+
+
+class ForgotEmailSendOtpReq(BaseModel):
+    """Request to verify phone and dispatch OTP to linked account email."""
+    phone: str
+    role: str = "user"
+
+
+class ForgotEmailVerifyOtpReq(BaseModel):
+    """Request to verify OTP and deliver the recovered email address."""
+    phone: str
+    role: str = "user"
+    otp_code: str
 
 
 class AuthUserResponse(BaseModel):

@@ -117,6 +117,233 @@ https://www.medqurex.tech
     return _send_mime_message(to_email, subject, text_body, html_body)
 
 
+def send_forgot_email_otp(to_email: str, recipient_name: str, otp_code: str, role: str = "user") -> bool:
+    """
+    Sends a 6-digit OTP verification email for retrieving the registered account email.
+    """
+    portal_name = "User Portal" if role == "user" else "Pharmacist Clinical Portal"
+    accent_color = "#0d9488" if role == "user" else "#7c3aed"
+    accent_dark = "#0f766e" if role == "user" else "#6d28d9"
+
+    subject = f"MedQurex - {otp_code} is your email recovery verification code"
+
+    text_body = f"""Hello {recipient_name or 'Valued Member'},
+
+We received an account recovery request to verify and locate your registered email address for MedQurex {portal_name}.
+
+Your 6-Digit Email Recovery Verification Code is:
+{otp_code}
+
+This code will expire in 15 minutes.
+Once entered on the recovery page, your account details will be confirmed.
+
+If you did not initiate this request, please disregard this email.
+
+Warm regards,
+MedQurex Clinical Intelligence Security Team
+https://www.medqurex.tech
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 520px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="background: linear-gradient(135deg, {accent_color}, {accent_dark}); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">MedQurex</h1>
+              <p style="margin: 6px 0 0; color: rgba(255, 255, 255, 0.85); font-size: 13px; font-weight: 500;">
+                Clinical Decision Support & Pharmacological Portal
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 28px;">
+              <h2 style="margin: 0 0 12px; font-size: 18px; font-weight: 600; color: #0f172a;">
+                Account Email Recovery Verification
+              </h2>
+              <p style="margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: #475569;">
+                Hello <strong>{recipient_name or 'Valued Member'}</strong>,<br/>
+                We received a request to retrieve your registered email using your phone number on MedQurex <strong>{portal_name}</strong>.
+              </p>
+
+              <div style="background-color: #f8fafc; border: 1px dashed {accent_color}; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+                <p style="margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
+                  Your Verification Code
+                </p>
+                <div style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: {accent_color}; font-family: monospace;">
+                  {otp_code}
+                </div>
+                <p style="margin: 10px 0 0; font-size: 12px; color: #94a3b8;">
+                  ⏱ Valid for 15 minutes only
+                </p>
+              </div>
+
+              <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                Enter this 6-digit code on the recovery screen to confirm your identity and reveal your registered account email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; padding: 20px 28px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                &copy; 2026 MedQurex Clinical Intelligence. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+    return _send_mime_message(to_email, subject, text_body, html_body)
+
+
+def send_welcome_email(to_email: str, recipient_name: str, role: str = "user") -> bool:
+    """
+    Sends a high-converting, professional congratulations and welcome email to newly registered users or pharmacists.
+    """
+    is_pharma = role.lower() == "pharmacist"
+    portal_name = "Pharmacist Clinical Intelligence Portal" if is_pharma else "Patient Health & Medication Portal"
+    accent_color = "#7c3aed" if is_pharma else "#0d9488"
+    accent_dark = "#6d28d9" if is_pharma else "#0f766e"
+    role_badge = "Licensed Pharmacist" if is_pharma else "Verified Patient"
+
+    subject = f"🎉 Welcome to MedQurex - Congratulations, {recipient_name or 'Member'}!"
+
+    text_body = f"""Congratulations and Welcome to MedQurex!
+
+Hello {recipient_name or 'Valued Member'},
+
+Welcome to MedQurex! Your {portal_name} account has been successfully created.
+
+Account Email: {to_email}
+Account Role: {role_badge}
+
+With MedQurex, you have instant access to:
+- Evidence-based clinical drug interaction analysis
+- Real-time pharmacological guidance and alerts
+- High-precision clinical decision intelligence
+
+You can access your portal anytime at: https://www.medqurex.tech
+
+If you have any questions or require clinical support, feel free to reply directly to this email.
+
+Warm congratulations,
+MedQurex Clinical Team
+https://www.medqurex.tech
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 36px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+          
+          <!-- Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, {accent_color}, {accent_dark}); padding: 40px 28px; text-align: center;">
+              <div style="display: inline-block; background: rgba(255, 255, 255, 0.2); padding: 8px 18px; border-radius: 999px; margin-bottom: 12px;">
+                <span style="color: #ffffff; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                  ✨ Account Activated
+                </span>
+              </div>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">
+                Welcome to MedQurex!
+              </h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
+                {portal_name}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 36px 32px;">
+              <h2 style="margin: 0 0 14px; font-size: 20px; font-weight: 700; color: #0f172a;">
+                Congratulations, {recipient_name or 'Valued Member'}! 🎊
+              </h2>
+              <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.7; color: #475569;">
+                Your account has been officially registered and verified on the <strong>MedQurex Clinical Intelligence Platform</strong>. We are thrilled to empower your healthcare journey with evidence-based pharmacological intelligence.
+              </p>
+
+              <!-- Account Summary Box -->
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">Registered Email:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 600; color: #0f172a; font-family: monospace;">{to_email}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">Access Tier:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 700; color: {accent_color};">{role_badge}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 13px; color: #64748b; padding: 4px 0;">System Status:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 600; color: #10b981;">Active & Ready</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Highlights -->
+              <h3 style="margin: 24px 0 12px; font-size: 14px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">
+                What you can do now:
+              </h3>
+              <ul style="margin: 0 0 24px; padding-left: 20px; font-size: 13px; line-height: 1.8; color: #475569;">
+                <li><strong>Cross-Check Drug Interactions:</strong> Prevent harmful multi-drug contraindications and adverse reactions.</li>
+                <li><strong>Pharmacological Insights:</strong> Review evidence-backed dosage, mechanism of action, and guidelines.</li>
+                <li><strong>Direct Clinical Decision Support:</strong> Fast, AI-enhanced recommendations tailored to patient parameters.</li>
+              </ul>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 32px 0 20px;">
+                <a href="https://www.medqurex.tech" style="display: inline-block; background: linear-gradient(135deg, {accent_color}, {accent_dark}); color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);">
+                  Launch MedQurex Portal &rarr;
+                </a>
+              </div>
+
+              <p style="margin: 20px 0 0; font-size: 12px; line-height: 1.6; color: #94a3b8; text-align: center;">
+                Need help? Simply reply to this email or visit our help center at <a href="https://www.medqurex.tech" style="color: {accent_color}; text-decoration: none;">medqurex.tech</a>.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+                &copy; 2026 MedQurex Clinical Intelligence Systems.<br/>
+                Empowering safe, precise, evidence-based medication guidance.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+    return _send_mime_message(to_email, subject, text_body, html_body)
+
+
 def send_email_recovery_notification(to_email: str, recipient_name: str, phone: str, role: str = "user") -> bool:
     """
     Sends an informative notification when a registered email is retrieved via verified phone number.

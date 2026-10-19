@@ -13,8 +13,11 @@ import {
   PharmacistSignupPayload,
   LoginPayload,
   ForgotPasswordOtpPayload,
+  VerifyOtpPayload,
   ResetPasswordVerifyPayload,
   ForgotEmailPayload,
+  ForgotEmailSendOtpResponse,
+  ForgotEmailVerifyOtpPayload,
   ForgotEmailResponse,
   ChatResponsePayload,
   ConversationSummary,
@@ -150,8 +153,26 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  verifyPasswordResetOtp: (data: VerifyOtpPayload): Promise<{ status: string; message: string }> =>
+    request<{ status: string; message: string }>("/auth/forgot-password/verify-otp", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   verifyAndResetPassword: (data: ResetPasswordVerifyPayload): Promise<{ status: string; message: string }> =>
     request<{ status: string; message: string }>("/auth/forgot-password/verify-and-reset", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  forgotEmailSendOtp: (data: ForgotEmailPayload): Promise<ForgotEmailSendOtpResponse> =>
+    request<ForgotEmailSendOtpResponse>("/auth/forgot-email/send-otp", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  forgotEmailVerifyOtp: (data: ForgotEmailVerifyOtpPayload): Promise<ForgotEmailResponse> =>
+    request<ForgotEmailResponse>("/auth/forgot-email/verify-otp", {
       method: "POST",
       body: JSON.stringify(data),
     }),
